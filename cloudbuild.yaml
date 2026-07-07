@@ -1,0 +1,211 @@
+# Cloud Build CI/CD Pipeline — Enterprise AI OS
+#
+# Branch strategy:
+#   main    → production  services  (enterprise-ai-backend / frontend / worker)
+#   develop → staging     services  (enterprise-ai-backend-staging / …)
+#
+# One-time setup — run these gcloud commands to connect your GitHub repo:
+#
+#   # 1. Connect the repository (opens browser)
+#   gcloud builds repositories create enterprise-ai-repo \
+#     --remote-uri=https://github.com/<YOUR_GITHUB_ORG>/Enterprise-AI-Operating-System \
+#     --connection=github-connection \
+#     --region=us-central1
+#
+#   # 2. Production trigger (main branch)
+#   gcloud builds triggers create github \
+#     --name=deploy-production \
+#     --region=us-central1 \
+#     --repository=projects/<PROJECT_ID>/locations/us-central1/connections/github-connection/repositories/enterprise-ai-repo \
+#     --branch-pattern="^main$" \
+#     --build-config=cloudbuild.yaml
+#
+#   # 3. Staging trigger (develop branch)
+#   gcloud builds triggers create github \
+#     --name=deploy-staging \
+#     --region=us-central1 \
+#     --repository=projects/<PROJECT_ID>/locations/us-central1/connections/github-connection/repositories/enterprise-ai-repo \
+#     --branch-pattern="^develop$" \
+#     --build-config=cloudbuild.yaml
+#
+# Override any substitution per-trigger via --substitutions flag.
+
+substitutions:
+  _REGION: us-central1
+  _PROJECT_ID: main-presence-500410-f8
+  _REPO: enterprise-ai
+  _CLOUD_SQL_CONN: main-presence-500410-f8:us-central1:enterprise-ai-db
+  _VPC_CONNECTOR: projects/main-presence-500410-f8/locations/us-central1/connectors/enterprise-ai-connector
+  # Memorystore Redis private IP — update after provisioning (see Step 4 in README)
+  _REDIS_URL: redis://10.0.0.3:6379/0
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+steps:
+  # ── 0. Resolve environment from branch name ─────────────────────────────────
+  # BRANCH_NAME is a Cloud Build built-in substitution injected at runtime.
+  # main → production services; anything else (develop, feature/*) → staging.
+  - name: bash
+    id: set-env
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        if [ "${BRANCH_NAME}" = "main" ]; then
+          echo "production"                    > /workspace/APP_ENV
+          echo "enterprise-ai-backend"         > /workspace/BACKEND_SVC
+          echo "enterprise-ai-worker"          > /workspace/WORKER_SVC
+          echo "enterprise-ai-frontend"        > /workspace/FRONTEND_SVC
+          echo "enterprise-ai-documents"       > /workspace/GCS_BUCKET
+        else
+          echo "staging"                              > /workspace/APP_ENV
+          echo "enterprise-ai-backend-staging"        > /workspace/BACKEND_SVC
+          echo "enterprise-ai-worker-staging"         > /workspace/WORKER_SVC
+          echo "enterprise-ai-frontend-staging"       > /workspace/FRONTEND_SVC
+          echo "enterprise-ai-documents-staging"      > /workspace/GCS_BUCKET
+        fi
+        echo "Branch : ${BRANCH_NAME}"
+        echo "Env    : $$(cat /workspace/APP_ENV)"
+        echo "Service: $$(cat /workspace/BACKEND_SVC)"
+
+  # ── 1. Build backend image ──────────────────────────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    id: build-backend
+    waitFor: [set-env]
+    args:
+      - build
+      - --tag
+      - ${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/backend:${SHORT_SHA}
+      - --tag
+      - ${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/backend:${BRANCH_NAME}
+      - --file
+      - backend/deployment/Dockerfile
+      # Layer cache from the same branch tag so incremental builds are fast
+      - --cache-from
+      - ${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/backend:${BRANCH_NAME}
+      - .
+
+  # ── 2. Build frontend image (parallel with backend) ─────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    id: build-frontend
+    waitFor: [set-env]
+    args:
+      - build
+      - --tag
+      - ${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/frontend:${SHORT_SHA}
+      - --tag
+      - ${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/frontend:${BRANCH_NAME}
+      - --file
+      - frontend/Dockerfile
+      - --cache-from
+      - ${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/frontend:${BRANCH_NAME}
+      - ./frontend
+
+  # ── 3. Push images ──────────────────────────────────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    id: push-backend
+    waitFor: [build-backend]
+    args: [push, --all-tags, "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/backend"]
+
+  - name: gcr.io/cloud-builders/docker
+    id: push-frontend
+    waitFor: [build-frontend]
+    args: [push, --all-tags, "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/frontend"]
+
+  # ── 4. Deploy backend API ───────────────────────────────────────────────────
+  - name: gcr.io/cloud-builders/gcloud
+    id: deploy-backend
+    waitFor: [push-backend]
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        svc=$$(cat /workspace/BACKEND_SVC)
+        env=$$(cat /workspace/APP_ENV)
+        bucket=$$(cat /workspace/GCS_BUCKET)
+        gcloud run deploy "$$svc" \
+          --image="${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/backend:${SHORT_SHA}" \
+          --region="${_REGION}" \
+          --platform=managed \
+          --allow-unauthenticated \
+          --port=8060 \
+          --memory=1Gi \
+          --cpu=1 \
+          --min-instances=0 \
+          --max-instances=10 \
+          --vpc-connector="${_VPC_CONNECTOR}" \
+          --add-cloudsql-instances="${_CLOUD_SQL_CONN}" \
+          --set-env-vars="APP_ENV=$$env,REDIS_URL=${_REDIS_URL},STORAGE_BACKEND=gcs,GCS_BUCKET=$$bucket,GCS_PROJECT_ID=${_PROJECT_ID},MESSAGING_BACKEND=pubsub" \
+          --set-secrets="APP_SECRET_KEY=APP_SECRET_KEY:latest,JWT_SECRET_KEY=JWT_SECRET_KEY:latest,DATABASE_URL=DATABASE_URL:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest"
+
+  # ── 5. Deploy Celery worker ─────────────────────────────────────────────────
+  - name: gcr.io/cloud-builders/gcloud
+    id: deploy-worker
+    waitFor: [push-backend]
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        svc=$$(cat /workspace/WORKER_SVC)
+        env=$$(cat /workspace/APP_ENV)
+        bucket=$$(cat /workspace/GCS_BUCKET)
+        gcloud run deploy "$$svc" \
+          --image="${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/backend:${SHORT_SHA}" \
+          --region="${_REGION}" \
+          --platform=managed \
+          --no-allow-unauthenticated \
+          --port=8060 \
+          --memory=1Gi \
+          --cpu=1 \
+          --min-instances=1 \
+          --max-instances=5 \
+          --vpc-connector="${_VPC_CONNECTOR}" \
+          --add-cloudsql-instances="${_CLOUD_SQL_CONN}" \
+          --command=celery \
+          --args="-A,backend.workers.celery_app,worker,--loglevel=info" \
+          --set-env-vars="APP_ENV=$$env,REDIS_URL=${_REDIS_URL},STORAGE_BACKEND=gcs,GCS_BUCKET=$$bucket,GCS_PROJECT_ID=${_PROJECT_ID},MESSAGING_BACKEND=pubsub" \
+          --set-secrets="APP_SECRET_KEY=APP_SECRET_KEY:latest,JWT_SECRET_KEY=JWT_SECRET_KEY:latest,DATABASE_URL=DATABASE_URL:latest"
+
+  # ── 6. Get backend URL ──────────────────────────────────────────────────────
+  - name: gcr.io/cloud-builders/gcloud
+    id: get-backend-url
+    waitFor: [deploy-backend]
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        svc=$$(cat /workspace/BACKEND_SVC)
+        url=$$(gcloud run services describe "$$svc" \
+          --region="${_REGION}" --format='value(status.url)')
+        echo "$$url" > /workspace/BACKEND_URL
+        echo "Backend URL: $$url"
+
+  # ── 7. Deploy frontend ──────────────────────────────────────────────────────
+  - name: gcr.io/cloud-builders/gcloud
+    id: deploy-frontend
+    waitFor: [push-frontend, get-backend-url]
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        svc=$$(cat /workspace/FRONTEND_SVC)
+        backend_url=$$(cat /workspace/BACKEND_URL)
+        gcloud run deploy "$$svc" \
+          --image="${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/frontend:${SHORT_SHA}" \
+          --region="${_REGION}" \
+          --platform=managed \
+          --allow-unauthenticated \
+          --port=3060 \
+          --memory=512Mi \
+          --cpu=1 \
+          --min-instances=0 \
+          --max-instances=5 \
+          --set-env-vars="NEXT_PUBLIC_BACKEND_URL=$$backend_url"
+
+images:
+  - ${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/backend:${SHORT_SHA}
+  - ${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/backend:${BRANCH_NAME}
+  - ${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/frontend:${SHORT_SHA}
+  - ${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/frontend:${BRANCH_NAME}

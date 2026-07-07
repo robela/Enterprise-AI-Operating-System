@@ -1,0 +1,64 @@
+replicaCount: 3
+
+image:
+  repository: enterprise-ai-os
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8060
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: api.enterprise-ai.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: enterprise-ai-tls
+      hosts:
+        - api.enterprise-ai.com
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+
+env:
+  APP_ENV: production
+  LOG_FORMAT: json
+  LOG_LEVEL: INFO
+
+secrets:
+  # Provide via --set or external secrets operator
+  DATABASE_URL: ""
+  REDIS_URL: ""
+  JWT_SECRET_KEY: ""
+  APP_SECRET_KEY: ""
+  OPENAI_API_KEY: ""
+
+postgresql:
+  enabled: true
+  auth:
+    database: enterprise_ai
+    username: postgres
+    existingSecret: enterprise-ai-db-secret
+
+redis:
+  enabled: true
+  architecture: standalone
