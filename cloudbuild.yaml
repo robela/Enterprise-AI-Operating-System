@@ -163,8 +163,8 @@ steps:
           --max-instances=5 \
           --vpc-connector="${_VPC_CONNECTOR}" \
           --add-cloudsql-instances="${_CLOUD_SQL_CONN}" \
-          --command=celery \
-          --args="-A,backend.workers.celery_app,worker,--loglevel=info" \
+          --command=bash \
+          --args="-c,python3 -m http.server 8060 & celery -A backend.workers.celery_app worker --loglevel=info" \
           --set-env-vars="APP_ENV=$$env,REDIS_URL=${_REDIS_URL},STORAGE_BACKEND=gcs,GCS_BUCKET=$$bucket,GCS_PROJECT_ID=${_PROJECT_ID},MESSAGING_BACKEND=pubsub" \
           --set-secrets="APP_SECRET_KEY=APP_SECRET_KEY:latest,JWT_SECRET_KEY=JWT_SECRET_KEY:latest,DATABASE_URL=DATABASE_URL:latest"
 
