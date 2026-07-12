@@ -8,7 +8,7 @@
 #
 #   # 1. Connect the repository (opens browser)
 #   gcloud builds repositories create enterprise-ai-repo \
-#     --remote-uri=https://github.com/<YOUR_GITHUB_ORG>/Enterprise-AI-Operating-System \
+#     --remote-uri=https://github.com/robela/Enterprise-AI-Operating-System \
 #     --connection=github-connection \
 #     --region=us-central1
 #
