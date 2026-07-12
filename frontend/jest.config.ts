@@ -18,7 +18,7 @@ const config: JestConfigWithTsJest = {
       },
     ],
   },
-  testPathPattern: "src/.*\\.(test|spec)\\.(ts|tsx)$",
+  testMatch: ["<rootDir>/src/**/*.{test,spec}.{ts,tsx}"],
   collectCoverageFrom: [
     "src/**/*.{ts,tsx}",
     "!src/**/*.d.ts",
