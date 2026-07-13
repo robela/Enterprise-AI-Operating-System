@@ -12,7 +12,8 @@ const nextConfig: NextConfig = {
     ],
   },
   async rewrites() {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    // Use runtime environment variable (set by Cloud Run)
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL_RUNTIME;
     if (!backendUrl) return [];
     return [
       {
@@ -20,6 +21,12 @@ const nextConfig: NextConfig = {
         destination: `${backendUrl}/api/v1/:path*`,
       },
     ];
+  },
+  serverRuntimeConfig: {
+    backendUrl: process.env.NEXT_PUBLIC_BACKEND_URL,
+  },
+  publicRuntimeConfig: {
+    backendUrl: process.env.NEXT_PUBLIC_BACKEND_URL,
   },
 };
 
