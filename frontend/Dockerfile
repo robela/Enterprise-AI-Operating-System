@@ -18,16 +18,18 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+# Install dumb-init to handle signals properly
+RUN apk add --no-cache dumb-init
 
+# Copy built application and public files
 COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 
-USER nextjs
 EXPOSE 3060
 ENV PORT=3060
 ENV HOSTNAME="0.0.0.0"
 
+# Use dumb-init to ensure Node.js receives signals
+ENTRYPOINT ["/sbin/dumb-init", "--"]
 CMD ["node", "server.js"]
