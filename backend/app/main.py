@@ -61,6 +61,19 @@ def create_app() -> FastAPI:
     # Routers
     app.include_router(api_router, prefix="/api/v1")
 
+    @app.get("/", tags=["info"])
+    async def root():
+        return {
+            "service": settings.app_name,
+            "version": "1.0.0",
+            "description": "Enterprise AI Operating System — multi-tenant, multi-industry AI platform",
+            "docs": "/docs",
+            "redoc": "/redoc",
+            "openapi": "/openapi.json",
+            "health": "/health",
+            "api": "/api/v1"
+        }
+
     @app.get("/health", tags=["health"])
     async def health_check():
         return {"status": "ok", "service": settings.app_name}
