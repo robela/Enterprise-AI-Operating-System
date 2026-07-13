@@ -1,5 +1,6 @@
 """Enterprise AI Operating System — FastAPI application factory."""
 from contextlib import asynccontextmanager
+import structlog
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +17,8 @@ from backend.core.exceptions.base import register_exception_handlers
 from backend.infrastructure.monitoring.telemetry import configure_telemetry
 from backend.api.rest.router import api_router
 
+logger = structlog.get_logger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -27,16 +30,12 @@ async def lifespan(app: FastAPI):
         try:
             await init_redis()
         except Exception as e:
-            import structlog
-            logger = structlog.get_logger(__name__)
             logger.warning("Failed to connect to Redis, continuing without caching", error=str(e))
         await event_bus.start()
         yield
         await event_bus.stop()
         await close_redis()
     except Exception as e:
-        import structlog
-        logger = structlog.get_logger(__name__)
         logger.error("Fatal error during app startup", error=str(e))
         raise
 
