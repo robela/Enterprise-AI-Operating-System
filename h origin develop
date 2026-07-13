@@ -1,0 +1,3 @@
+[33md9cd3f1[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdevelop[m[33m)[m fix: handle unauthenticated users on homepage and improve next.js config
+[33m640c91e[m[33m ([m[1;31morigin/develop[m[33m)[m fix: add http.server health check alongside celery worker for Cloud Run
+[33m8b7d8cf[m fix: add missing public directory required by Dockerfile

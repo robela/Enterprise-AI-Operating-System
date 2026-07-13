@@ -19,6 +19,13 @@ export default function HomePage() {
     }
   }, [token, isLoading, router]);
 
-  // Show nothing while checking authentication
-  return null;
+  // Show a simple loading/redirect indicator
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-white">
+      <div className="text-center">
+        <h1 className="text-2xl font-semibold mb-2">Loading...</h1>
+        <p className="text-gray-600">Redirecting you to the appropriate page</p>
+      </div>
+    </div>
+  );
 }
