@@ -21,14 +21,22 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Install dumb-init to handle signals properly
 RUN apk add --no-cache dumb-init
 
-# Copy built application and public files
-COPY --from=builder /app/public ./public
+# Copy the standalone output - this includes server.js
 COPY --from=builder /app/.next/standalone ./
+
+# Copy static assets
 COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+
+# Copy package.json for reference (not used but good to have)
+COPY --from=builder /app/package.json ./
 
 EXPOSE 3060
 ENV PORT=3060
 ENV HOSTNAME="0.0.0.0"
+
+# Debug: Check if server.js exists
+RUN ls -la /app/ && echo "---" && ls -la /app/.next/ || true
 
 # Use dumb-init to ensure Node.js receives signals
 ENTRYPOINT ["/sbin/dumb-init", "--"]
