@@ -18,24 +18,29 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3060
-ENV HOSTNAME=0.0.0.0
 
 # Install dumb-init for signal handling
 RUN apk add --no-cache dumb-init
 
-# Copy the entire standalone output - structure includes server.js and all dependencies
-# The .next/standalone directory when extracted contains the full server setup
-COPY --from=builder /app/.next/standalone /app/
+# The .next/standalone output when built with "output: standalone" contains a self-contained
+# server.js and necessary dependencies. We copy it directly to the working directory.
+COPY --from=builder /app/.next/standalone .
 
-# Copy static files (these are needed separately as they're not in standalone)
-COPY --from=builder /app/.next/static /app/.next/static
-COPY --from=builder /app/public /app/public
+# Copy public assets (required separately from standalone output)
+COPY --from=builder /app/public ./public
 
-# Verify the server.js file exists and is executable
-RUN ls -la /app/ && file /app/server.js || echo "server.js not found, listing contents:" && find /app -name "*.js" -type f | head -20
+# Verify structure
+RUN echo "=== Files in /app ===" && ls -la /app/ && \
+    echo "=== Checking server.js ===" && file /app/server.js && \
+    echo "=== Contents of .next ===" && ls -la /app/.next/ 2>/dev/null || echo ".next directory may not exist in standalone"
 
 EXPOSE 3060
 
+# Set environment variables for the Node.js server
+ENV PORT=3060
+ENV HOSTNAME=0.0.0.0
+
+# Use dumb-init as PID 1 to handle signals properly
 ENTRYPOINT ["/sbin/dumb-init", "--"]
+# Run the Next.js server
 CMD ["node", "server.js"]
