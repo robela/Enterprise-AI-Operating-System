@@ -34,10 +34,10 @@ RUN echo "=== Files in /app ===" && ls -la /app/ && \
     echo "=== Checking server.js ===" && file /app/server.js && \
     echo "=== Contents of .next ===" && ls -la /app/.next/ 2>/dev/null || echo ".next directory may not exist in standalone"
 
-EXPOSE 3060
+EXPOSE 3000
 
 # Set environment variables for the Node.js server
-ENV PORT=3060
+ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
 # Use dumb-init as PID 1 to handle signals properly
