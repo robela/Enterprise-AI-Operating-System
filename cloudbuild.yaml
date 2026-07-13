@@ -137,7 +137,7 @@ steps:
           --max-instances=10 \
           --vpc-connector="${_VPC_CONNECTOR}" \
           --add-cloudsql-instances="${_CLOUD_SQL_CONN}" \
-          --set-env-vars="APP_ENV=$$env,REDIS_URL=${_REDIS_URL},STORAGE_BACKEND=gcs,GCS_BUCKET=$$bucket,GCS_PROJECT_ID=${_PROJECT_ID},MESSAGING_BACKEND=pubsub" \
+          --set-env-vars="APP_ENV=$$env,APP_DEBUG=false,REDIS_URL=${_REDIS_URL},STORAGE_BACKEND=gcs,GCS_BUCKET=$$bucket,GCS_PROJECT_ID=${_PROJECT_ID},MESSAGING_BACKEND=pubsub,CORS_ORIGINS=http://localhost:3000" \
           --set-secrets="APP_SECRET_KEY=APP_SECRET_KEY:latest,JWT_SECRET_KEY=JWT_SECRET_KEY:latest,DATABASE_URL=DATABASE_URL:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest"
 
   # ── 5. Deploy Celery worker ─────────────────────────────────────────────────

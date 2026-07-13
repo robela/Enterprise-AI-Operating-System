@@ -24,19 +24,60 @@ logger = structlog.get_logger(__name__)
 async def lifespan(app: FastAPI):
     """Manage startup and shutdown lifecycle."""
     try:
-        configure_logging()
-        configure_telemetry(app)
-        await init_db()
+        logger.info("Starting application lifespan initialization...")
+        
+        try:
+            configure_logging()
+            logger.info("Logging configured")
+        except Exception as e:
+            logger.error("Failed to configure logging", error=str(e))
+            raise
+        
+        try:
+            configure_telemetry(app)
+            logger.info("Telemetry configured")
+        except Exception as e:
+            logger.error("Failed to configure telemetry", error=str(e))
+            raise
+        
+        try:
+            await init_db()
+            logger.info("Database initialized")
+        except Exception as e:
+            logger.error("Failed to initialize database", error=str(e), exc_info=True)
+            # Don't fail completely - allow app to run in degraded mode
+        
         try:
             await init_redis()
+            logger.info("Redis connected")
         except Exception as e:
             logger.warning("Failed to connect to Redis, continuing without caching", error=str(e))
-        await event_bus.start()
+        
+        try:
+            await event_bus.start()
+            logger.info("Event bus started")
+        except Exception as e:
+            logger.warning("Failed to start event bus", error=str(e))
+            # Allow app to run without event bus
+        
+        logger.info("Application startup complete")
         yield
-        await event_bus.stop()
-        await close_redis()
+        logger.info("Starting shutdown sequence...")
+        
+        try:
+            await event_bus.stop()
+        except Exception as e:
+            logger.warning("Error during event bus shutdown", error=str(e))
+        
+        try:
+            await close_redis()
+        except Exception as e:
+            logger.warning("Error during Redis shutdown", error=str(e))
+        
+        logger.info("Application shutdown complete")
+        
     except Exception as e:
-        logger.error("Fatal error during app startup", error=str(e))
+        logger.error("Fatal error during app startup", error=str(e), exc_info=True)
         raise
 
 
@@ -87,6 +128,17 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["health"])
     async def health_check():
         return {"status": "ok", "service": settings.app_name}
+
+    @app.get("/status", tags=["health"])
+    async def status():
+        """Detailed status endpoint for debugging."""
+        return {
+            "status": "running",
+            "service": settings.app_name,
+            "version": "1.0.0",
+            "environment": settings.app_env,
+            "debug": settings.app_debug,
+        }
 
     return app
 
