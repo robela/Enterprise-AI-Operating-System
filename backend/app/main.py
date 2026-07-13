@@ -20,14 +20,25 @@ from backend.api.rest.router import api_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage startup and shutdown lifecycle."""
-    configure_logging()
-    configure_telemetry(app)
-    await init_db()
-    await init_redis()
-    await event_bus.start()
-    yield
-    await event_bus.stop()
-    await close_redis()
+    try:
+        configure_logging()
+        configure_telemetry(app)
+        await init_db()
+        try:
+            await init_redis()
+        except Exception as e:
+            import structlog
+            logger = structlog.get_logger(__name__)
+            logger.warning("Failed to connect to Redis, continuing without caching", error=str(e))
+        await event_bus.start()
+        yield
+        await event_bus.stop()
+        await close_redis()
+    except Exception as e:
+        import structlog
+        logger = structlog.get_logger(__name__)
+        logger.error("Fatal error during app startup", error=str(e))
+        raise
 
 
 def create_app() -> FastAPI:
