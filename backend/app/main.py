@@ -1,4 +1,5 @@
 """Enterprise AI Operating System — FastAPI application factory."""
+import asyncio
 from contextlib import asynccontextmanager
 import structlog
 
@@ -18,6 +19,9 @@ from backend.infrastructure.monitoring.telemetry import configure_telemetry
 from backend.api.rest.router import api_router
 
 logger = structlog.get_logger(__name__)
+
+STARTUP_DB_TIMEOUT_SECONDS = 10
+STARTUP_REDIS_TIMEOUT_SECONDS = 5
 
 
 @asynccontextmanager
@@ -41,15 +45,25 @@ async def lifespan(app: FastAPI):
             raise
         
         try:
-            await init_db()
+            await asyncio.wait_for(init_db(), timeout=STARTUP_DB_TIMEOUT_SECONDS)
             logger.info("Database initialized")
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Database initialization timed out; continuing in degraded mode",
+                timeout_seconds=STARTUP_DB_TIMEOUT_SECONDS,
+            )
         except Exception as e:
             logger.error("Failed to initialize database", error=str(e), exc_info=True)
             # Don't fail completely - allow app to run in degraded mode
         
         try:
-            await init_redis()
+            await asyncio.wait_for(init_redis(), timeout=STARTUP_REDIS_TIMEOUT_SECONDS)
             logger.info("Redis connected")
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Redis initialization timed out; continuing without caching",
+                timeout_seconds=STARTUP_REDIS_TIMEOUT_SECONDS,
+            )
         except Exception as e:
             logger.warning("Failed to connect to Redis, continuing without caching", error=str(e))
         
