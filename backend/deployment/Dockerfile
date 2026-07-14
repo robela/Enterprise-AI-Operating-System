@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml .
+COPY backend/ ./backend/
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir ".[dev]" 2>/dev/null || pip install --no-cache-dir .
 
