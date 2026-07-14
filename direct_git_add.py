@@ -10,8 +10,7 @@ os.chdir(repo_dir)
 
 files_to_stage = [
     "cleanup.py",
-    "cleanup_and_add.bat",
-    "test_backend.py",
+    "direct_git_add.py",
 ]
 
 print("=" * 70)

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -140,11 +141,19 @@ def collect_candidates(repo_root: Path) -> list[Path]:
     return candidates
 
 
+def to_windows_raw_path(path: Path) -> str:
+    raw_path = str(path.resolve(strict=False))
+    if os.name != "nt" or raw_path.startswith("\\\\?\\"):
+        return raw_path
+    return f"\\\\?\\{raw_path}"
+
+
 def remove_candidate(path: Path) -> None:
+    raw_path = to_windows_raw_path(path)
     if path.is_dir():
-        shutil.rmtree(path)
-    else:
-        path.unlink()
+        shutil.rmtree(raw_path)
+        return
+    os.unlink(raw_path)
 
 
 def parse_args() -> argparse.Namespace:
