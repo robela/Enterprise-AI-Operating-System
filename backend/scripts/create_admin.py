@@ -24,6 +24,32 @@ from backend.domains.users.infrastructure.persistence.user_repository_impl impor
 from backend.domains.users.domain.entities.user import User
 
 
+def build_or_update_admin_user(
+    existing_user: User | None,
+    email: str,
+    password: str,
+    full_name: str,
+) -> tuple[User, bool]:
+    hashed_password = hash_password(password)
+
+    if existing_user is None:
+        user = User.create(
+            tenant_id="default",
+            email=email,
+            full_name=full_name,
+            hashed_password=hashed_password,
+            roles=["admin"],
+        )
+        user.activate()
+        return user, True
+
+    existing_user.full_name = full_name
+    existing_user.hashed_password = hashed_password
+    existing_user.roles = ["admin"]
+    existing_user.activate()
+    return existing_user, False
+
+
 async def create_admin(email: str, password: str, full_name: str) -> None:
     engine = create_async_engine(settings.database_url, echo=False)
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -35,23 +61,13 @@ async def create_admin(email: str, password: str, full_name: str) -> None:
         repo = SQLAlchemyUserRepository(session)
 
         existing = await repo.get_by_email(email, tenant_id="default")
-        if existing:
-            print(f"[!] User '{email}' already exists — skipping.")
-            await engine.dispose()
-            return
-
-        user = User.create(
-            tenant_id="default",
-            email=email,
-            full_name=full_name,
-            hashed_password=hash_password(password),
-            roles=["admin"],
-        )
+        user, created = build_or_update_admin_user(existing, email, password, full_name)
         await repo.save(user)
         await session.commit()
 
     await engine.dispose()
-    print(f"[+] Admin user created successfully!")
+    action = "created" if created else "updated"
+    print(f"[+] Admin user {action} successfully!")
     print(f"    Email   : {email}")
     print(f"    Password: {password}")
     print(f"    Roles   : admin")
