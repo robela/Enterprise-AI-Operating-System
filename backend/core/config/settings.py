@@ -108,6 +108,19 @@ class Settings(BaseSettings):
             return [item.strip() for item in raw.split(",") if item.strip()]
         return value
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_url(cls, value):
+        if not isinstance(value, str):
+            return value
+
+        raw = value.strip()
+        if raw.startswith("postgres://"):
+            return "postgresql+asyncpg://" + raw[len("postgres://"):]
+        if raw.startswith("postgresql://") and "+" not in raw.split("://", 1)[0]:
+            return "postgresql+asyncpg://" + raw[len("postgresql://"):]
+        return raw
+
     # Email
     smtp_host: str = Field("smtp.gmail.com", alias="SMTP_HOST")
     smtp_port: int = Field(587, alias="SMTP_PORT")
