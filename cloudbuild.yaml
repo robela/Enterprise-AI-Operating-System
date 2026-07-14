@@ -129,7 +129,6 @@ steps:
           --image="${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/backend:${SHORT_SHA}" \
           --region="${_REGION}" \
           --platform=managed \
-          --no-invoker-iam-check \
           --port=8060 \
           --memory=1Gi \
           --cpu=1 \
@@ -196,7 +195,6 @@ steps:
           --image="${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/frontend:${SHORT_SHA}" \
           --region="${_REGION}" \
           --platform=managed \
-          --no-invoker-iam-check \
           --port=3000 \
           --memory=512Mi \
           --cpu=1 \
