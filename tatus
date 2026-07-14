@@ -1,5 +1,0 @@
-[33m7c1e19a[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdevelop[m[33m, [m[1;31morigin/develop[m[33m)[m fix conflict
-[33mc1c379c[m fix: add root endpoint to resolve 403 Forbidden error
-[33m0459e52[m fix: resolve 403 by fixing next.config rewrites and adding API proxy route
-[33me9e7d0e[m fix: correct Dockerfile standalone output structure - server.js at root level
-[33m2e6a485[m fix: improve Dockerfile with better standalone output handling and diagnostics
