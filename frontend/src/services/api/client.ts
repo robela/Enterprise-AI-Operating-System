@@ -1,7 +1,8 @@
 import axios, { type AxiosError } from "axios";
 
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8060";
+// Use the frontend's same-origin API proxy by default so client bundles do not
+// bake in a deployment-specific backend host at build time.
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL?.trim() || "";
 
 export const apiClient = axios.create({
   baseURL: BACKEND_URL,

@@ -11,10 +11,15 @@ import {
 import { apiClient } from "@/services/api/client";
 import type { UserRole } from "./types";
 
+interface AccessTokenPayload {
+  sub?: string;
+  roles?: string[];
+}
+
 interface AuthContextType {
   token: string | null;
   username: string | null;
-  user_id: number | null;
+  user_id: string | null;
   role: UserRole | null;
   isLoading: boolean;
   loginError: string | null;
@@ -24,10 +29,53 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+function decodeAccessTokenPayload(token: string): AccessTokenPayload | null {
+  try {
+    const [, payload] = token.split(".");
+
+    if (!payload) {
+      return null;
+    }
+
+    const normalizedPayload = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const paddedPayload = normalizedPayload.padEnd(
+      normalizedPayload.length + ((4 - (normalizedPayload.length % 4)) % 4),
+      "="
+    );
+
+    return JSON.parse(atob(paddedPayload)) as AccessTokenPayload;
+  } catch {
+    return null;
+  }
+}
+
+function resolveRole(accessToken: string, roleFromResponse?: string): UserRole | null {
+  if (roleFromResponse === "admin" || roleFromResponse === "user" || roleFromResponse === "callAgent") {
+    return roleFromResponse;
+  }
+
+  const payload = decodeAccessTokenPayload(accessToken);
+  const tokenRoles = payload?.roles ?? [];
+
+  if (tokenRoles.includes("admin")) {
+    return "admin";
+  }
+
+  if (tokenRoles.includes("callAgent")) {
+    return "callAgent";
+  }
+
+  if (tokenRoles.includes("user")) {
+    return "user";
+  }
+
+  return null;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
-  const [user_id, setUserId] = useState<number | null>(null);
+  const [user_id, setUserId] = useState<string | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -42,8 +90,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (storedToken) {
       setToken(storedToken);
       setUsername(storedUsername);
-      setRole(storedRole);
-      setUserId(storedUserId ? parseInt(storedUserId, 10) : null);
+      setRole(storedRole ?? resolveRole(storedToken));
+      setUserId(storedUserId);
     }
     setIsLoading(false);
   }, []);
@@ -59,16 +107,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const { access_token, username: uname, user_id: uid, role: urole } = data;
+    const resolvedRole = resolveRole(access_token, urole);
+    const resolvedUserId = typeof uid === "string" ? uid : decodeAccessTokenPayload(access_token)?.sub ?? null;
 
     localStorage.setItem("token", access_token);
     localStorage.setItem("username", uname ?? usernameInput);
-    localStorage.setItem("role", urole ?? "user");
-    localStorage.setItem("user_id", String(uid ?? ""));
+    if (resolvedRole) {
+      localStorage.setItem("role", resolvedRole);
+    } else {
+      localStorage.removeItem("role");
+    }
+    if (resolvedUserId) {
+      localStorage.setItem("user_id", resolvedUserId);
+    } else {
+      localStorage.removeItem("user_id");
+    }
 
     setToken(access_token);
     setUsername(uname ?? usernameInput);
-    setRole(urole ?? "user");
-    setUserId(uid ?? null);
+    setRole(resolvedRole);
+    setUserId(resolvedUserId);
   }, []);
 
   const logout = useCallback(() => {
