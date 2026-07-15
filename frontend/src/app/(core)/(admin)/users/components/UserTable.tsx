@@ -4,7 +4,7 @@ export interface UserTableProps {
   users: User[];
   isLoading: boolean;
   onEdit: (user: User) => void;
-  onDelete: (userId: number) => void;
+  onDelete: (userId: string) => void;
 }
 
 export function UserTable({

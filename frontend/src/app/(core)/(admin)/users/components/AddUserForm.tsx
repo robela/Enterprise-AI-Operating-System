@@ -52,6 +52,18 @@ export function AddUserForm({ onSuccess }: AddUserFormProps) {
         <h2 className="text-lg font-semibold mb-4">Add New User</h2>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-1">
+            <label className="text-sm font-medium">Full Name</label>
+            <input
+              type="text"
+              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              {...register("full_name")}
+            />
+            {errors.full_name && (
+              <p className="text-destructive text-xs">{errors.full_name.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-1">
             <label className="text-sm font-medium">Email</label>
             <input
               type="email"

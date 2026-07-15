@@ -20,7 +20,7 @@ export function useUserManagement() {
     }
   }, []);
 
-  const deleteUser = useCallback(async (userId: number) => {
+  const deleteUser = useCallback(async (userId: string) => {
     await userService.delete(userId);
     setUsers((prev) => prev.filter((u) => u.id !== userId));
   }, []);

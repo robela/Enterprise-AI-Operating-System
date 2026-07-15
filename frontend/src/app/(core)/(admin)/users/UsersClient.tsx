@@ -16,7 +16,7 @@ export function UsersClient() {
     fetchUsers();
   }, [fetchUsers]);
 
-  const handleDelete = async (userId: number) => {
+  const handleDelete = async (userId: string) => {
     try {
       await deleteUser(userId);
       toast.success("User deleted");
