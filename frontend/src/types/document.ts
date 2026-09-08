@@ -1,12 +1,16 @@
 import { z } from "zod";
 
 export const documentSchema = z.object({
-  id: z.number(),
-  name: z.string(),
-  content_type: z.string(),
-  size_bytes: z.number(),
-  created_at: z.string(),
-  tenant_id: z.string().optional(),
+  document_id: z.string(),
+  filename: z.string(),
+  status: z.enum(["pending", "processing", "indexed", "failed"]),
+});
+
+export const documentUploadSchema = z.object({
+  document_id: z.string(),
+  status: z.enum(["pending", "processing", "indexed", "failed"]),
+  chunk_count: z.number(),
 });
 
 export type Document = z.infer<typeof documentSchema>;
+export type DocumentUploadResult = z.infer<typeof documentUploadSchema>;

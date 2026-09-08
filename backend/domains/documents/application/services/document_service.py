@@ -41,3 +41,21 @@ class DocumentService:
 
     async def delete(self, document_id: str, tenant_id: str) -> None:
         await self._repo.delete(document_id, tenant_id)
+
+    async def mark_processing(self, document_id: str, tenant_id: str) -> Document:
+        doc = await self.get(document_id, tenant_id)
+        doc.mark_processing()
+        await self._repo.save(doc)
+        return doc
+
+    async def mark_indexed(self, document_id: str, tenant_id: str, chunk_count: int) -> Document:
+        doc = await self.get(document_id, tenant_id)
+        doc.mark_indexed(chunk_count)
+        await self._repo.save(doc)
+        return doc
+
+    async def mark_failed(self, document_id: str, tenant_id: str) -> Document:
+        doc = await self.get(document_id, tenant_id)
+        doc.mark_failed()
+        await self._repo.save(doc)
+        return doc

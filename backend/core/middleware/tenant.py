@@ -13,11 +13,21 @@ TENANT_CONTEXT_KEY = "tenant_id"
 
 class TenantMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
-        tenant_id = (
-            request.headers.get("X-Tenant-ID")
-            or self._tenant_from_token(request)
-            or settings.default_tenant_id
-        )
+        tenant_from_header = request.headers.get("X-Tenant-ID")
+        tenant_from_token = self._tenant_from_token(request)
+
+        if (
+            tenant_from_header
+            and tenant_from_token
+            and tenant_from_header != tenant_from_token
+        ):
+            logger.warning(
+                "Tenant header/token mismatch",
+                header_tenant_id=tenant_from_header,
+                token_tenant_id=tenant_from_token,
+            )
+
+        tenant_id = tenant_from_token or tenant_from_header or settings.default_tenant_id
         request.state.tenant_id = tenant_id
         structlog.contextvars.bind_contextvars(tenant_id=tenant_id)
         response = await call_next(request)

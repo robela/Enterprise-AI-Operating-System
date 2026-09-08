@@ -1,7 +1,7 @@
 """FastAPI OAuth2 password bearer dependency + RBAC helpers."""
 from typing import Annotated
 
-from fastapi import Depends, Security
+from fastapi import Depends, Request, Security
 from fastapi.security import OAuth2PasswordBearer, SecurityScopes
 
 from backend.core.security.jwt import decode_token
@@ -33,6 +33,7 @@ class CurrentUser:
 
 async def get_current_user(
     security_scopes: SecurityScopes,
+    request: Request,
     token: Annotated[str, Depends(oauth2_scheme)],
 ) -> CurrentUser:
     if security_scopes.scopes:
@@ -54,9 +55,20 @@ async def get_current_user(
                 headers={"WWW-Authenticate": authenticate_value},
             )
 
+    tenant_id = payload.get("tenant_id")
+    if not tenant_id:
+        raise UnauthorizedException(
+            "Token missing tenant context",
+            headers={"WWW-Authenticate": authenticate_value},
+        )
+
+    requested_tenant = request.headers.get("X-Tenant-ID")
+    if requested_tenant and requested_tenant != tenant_id:
+        raise ForbiddenException("Tenant context mismatch")
+
     return CurrentUser(
         user_id=user_id,
-        tenant_id=payload.get("tenant_id", "default"),
+        tenant_id=tenant_id,
         roles=payload.get("roles", []),
         scopes=token_scopes,
     )

@@ -15,6 +15,7 @@ class WorkflowService:
         name: str,
         initiator_id: str,
         context: dict | None = None,
+        initial_tasks: list[WorkflowTask] | None = None,
     ) -> Workflow:
         wf = Workflow.create(
             tenant_id=tenant_id,
@@ -23,6 +24,8 @@ class WorkflowService:
             initiator_id=initiator_id,
             context=context,
         )
+        if initial_tasks:
+            wf.tasks = initial_tasks
         await self._repo.save(wf)
         return wf
 

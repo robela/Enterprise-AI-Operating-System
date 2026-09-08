@@ -5,6 +5,12 @@ from backend.core.config.settings import settings
 
 def get_provider(provider_name: str | None = None) -> BaseAIProvider:
     name = (provider_name or settings.ai_provider).lower()
+    
+    # If no API key is configured for the default provider, use mock for testing
+    if name == "openai" and not settings.openai_api_key:
+        from backend.ai.providers.mock import MockProvider
+        return MockProvider()
+    
     if name == "openai":
         from backend.ai.providers.openai import OpenAIProvider
         return OpenAIProvider()
@@ -20,4 +26,7 @@ def get_provider(provider_name: str | None = None) -> BaseAIProvider:
     if name == "ollama":
         from backend.ai.providers.ollama import OllamaProvider
         return OllamaProvider()
+    if name == "mock":
+        from backend.ai.providers.mock import MockProvider
+        return MockProvider()
     raise ValueError(f"Unknown AI provider: {name!r}")

@@ -50,7 +50,7 @@ async function proxyRequest(req: NextRequest) {
     const headers = new Headers();
     req.headers.forEach((value, key) => {
       // Skip host and other headers that shouldn't be forwarded
-      if (!['host', 'connection'].includes(key.toLowerCase())) {
+      if (!['host', 'connection', 'content-length', 'transfer-encoding'].includes(key.toLowerCase())) {
         headers.set(key, value);
       }
     });
@@ -63,7 +63,10 @@ async function proxyRequest(req: NextRequest) {
 
     // Include body for non-GET requests
     if (req.method !== 'GET' && req.method !== 'HEAD') {
-      init.body = await req.text();
+      const bodyBuffer = await req.arrayBuffer();
+      if (bodyBuffer.byteLength > 0) {
+        init.body = bodyBuffer;
+      }
     }
 
     const response = await fetch(url.toString(), init);

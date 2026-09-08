@@ -49,21 +49,33 @@ class RAGPipeline:
         provider = get_provider()
         query_embedding = (await provider.embed([question]))[0]
 
-        candidates = await self._retriever.retrieve(query_embedding, top_k=top_k * 2)
-        chunks = self._reranker.rerank(question, candidates, top_k=top_k)
+        try:
+            candidates = await self._retriever.retrieve(query_embedding, top_k=top_k * 2)
+            chunks = self._reranker.rerank(question, candidates, top_k=top_k)
+        except Exception as exc:
+            logger.warning("rag_retrieval_failed", tenant_id=self.tenant_id, error=str(exc))
+            chunks = []
 
         context = "\n\n".join(
             f"[Source: {c.document_id}]\n{c.text}" for c in chunks
         )
 
+        if system_prompt:
+            if "{context}" in system_prompt:
+                rendered_system_prompt = system_prompt.replace("{context}", context)
+            else:
+                rendered_system_prompt = f"{system_prompt}\n\nContext:\n{context}"
+        else:
+            rendered_system_prompt = (
+                "You are a helpful assistant. Answer based on the context below. "
+                "Always cite sources using [Source: ...] notation.\n\n"
+                f"Context:\n{context}"
+            )
+
         messages = [
             ChatMessage(
                 role="system",
-                content=system_prompt or (
-                    "You are a helpful assistant. Answer based on the context below. "
-                    "Always cite sources using [Source: ...] notation.\n\n"
-                    f"Context:\n{context}"
-                ),
+                content=rendered_system_prompt,
             ),
             ChatMessage(role="user", content=question),
         ]

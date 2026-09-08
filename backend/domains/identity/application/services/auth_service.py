@@ -52,6 +52,8 @@ class AuthService:
         scopes = ["users:read"]
         if "admin" in roles:
             scopes += ["users:write", "admin"]
+        elif "tenant_admin" in roles:
+            scopes += ["users:write"]
         elif "manager" in roles:
             scopes += ["users:write"]
         return scopes

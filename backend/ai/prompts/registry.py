@@ -27,14 +27,42 @@ _PROMPTS: dict[str, dict[str, str]] = {
 
 
 class PromptRegistry:
+    class _SafeDict(dict):
+        def __missing__(self, key: str) -> str:
+            return "{" + key + "}"
+
+    @staticmethod
+    def _render_template(template: str, variables: dict[str, Any] | None = None) -> str:
+        if not variables:
+            return template
+        return template.format_map(PromptRegistry._SafeDict(variables))
+
     def get(self, prompt_id: str, variables: dict[str, Any] | None = None) -> str:
         entry = _PROMPTS.get(prompt_id)
         if not entry:
             raise KeyError(f"Prompt {prompt_id!r} not found in registry")
         template = entry["template"]
-        if variables:
-            return template.format(**variables)
-        return template
+        return self._render_template(template, variables)
+
+    def get_for_tenant(
+        self,
+        prompt_id: str,
+        tenant_id: str,
+        tenant_settings: dict[str, Any] | None = None,
+        variables: dict[str, Any] | None = None,
+    ) -> str:
+        prompts = (tenant_settings or {}).get("prompts", {})
+        tenant_template = prompts.get(prompt_id)
+
+        merged_variables = {
+            "tenant_id": tenant_id,
+            **(variables or {}),
+        }
+
+        if isinstance(tenant_template, str) and tenant_template.strip():
+            return self._render_template(tenant_template, merged_variables)
+
+        return self.get(prompt_id, merged_variables)
 
     def register(self, prompt_id: str, template: str, version: str = "1") -> None:
         _PROMPTS[prompt_id] = {"template": template, "version": version}

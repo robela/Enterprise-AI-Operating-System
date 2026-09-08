@@ -1,15 +1,17 @@
 "use client";
 
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/utils/auth";
 import { toast } from "sonner";
 
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
+  tenantId: z.string().min(1, "Tenant is required"),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -17,19 +19,31 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export function LoginForm() {
   const { login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    defaultValues: {
+      tenantId: "default",
+    },
   });
+
+  useEffect(() => {
+    const tenantFromQuery = searchParams.get("tenant");
+    if (tenantFromQuery) {
+      setValue("tenantId", tenantFromQuery);
+    }
+  }, [searchParams, setValue]);
 
   const onSubmit = async (data: LoginFormData) => {
     try {
-      await login(data.username, data.password);
-      router.push("/dashboard");
+      await login(data.username, data.password, data.tenantId);
+      router.push("/chat");
     } catch {
       toast.error("Invalid credentials. Please try again.");
     }
@@ -53,6 +67,22 @@ export function LoginForm() {
         />
         {errors.username && (
           <p className="text-destructive text-xs">{errors.username.message}</p>
+        )}
+      </div>
+
+      <div className="space-y-1">
+        <label htmlFor="tenantId" className="text-sm font-medium">
+          Tenant
+        </label>
+        <input
+          id="tenantId"
+          type="text"
+          autoComplete="organization"
+          className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          {...register("tenantId")}
+        />
+        {errors.tenantId && (
+          <p className="text-destructive text-xs">{errors.tenantId.message}</p>
         )}
       </div>
 

@@ -7,6 +7,7 @@ const backendUserSchema = userSchema.extend({
 
 type BackendUser = {
   user_id: string;
+  tenant_id?: string;
   email: string;
   full_name: string;
   roles: string[];
@@ -15,12 +16,17 @@ type BackendUser = {
 };
 
 function normalizeUser(user: BackendUser): User {
-  const primaryRole = user.roles.find(
-    (role): role is User["role"] => role === "admin" || role === "user" || role === "callAgent"
-  ) ?? "user";
+  const primaryRole: User["role"] = user.roles.includes("admin")
+    ? "admin"
+    : user.roles.includes("tenant_admin")
+      ? "tenant_admin"
+      : user.roles.includes("tenant_user") || user.roles.includes("user") || user.roles.includes("callAgent")
+        ? "tenant_user"
+        : "tenant_user";
 
   return userSchema.parse({
     id: user.user_id,
+    tenant_id: user.tenant_id,
     email: user.email,
     full_name: user.full_name,
     role: primaryRole,
@@ -48,6 +54,7 @@ export const userService = {
       full_name: validated.full_name,
       password: validated.password,
       roles: [validated.role],
+      tenant_id: validated.role === "admin" ? undefined : validated.tenant_id,
     };
     const { data } = await apiClient.post("/api/v1/users", payload);
     return normalizeUser(data as BackendUser);

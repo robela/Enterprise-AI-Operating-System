@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  output: process.env.NODE_ENV === "production" ? "standalone" : undefined,
+  outputFileTracingRoot: path.resolve(__dirname),
   reactStrictMode: true,
   images: {
     remotePatterns: [

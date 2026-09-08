@@ -13,6 +13,7 @@ class UserCreateRequest(BaseModel):
     email: EmailStr
     full_name: str
     password: str
+    tenant_id: Optional[str] = None
     roles: Optional[list[str]] = None
 
     @field_validator("password")
@@ -20,6 +21,18 @@ class UserCreateRequest(BaseModel):
     def strong_password(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters")
+        return v
+
+    @field_validator("roles")
+    @classmethod
+    def validate_roles(cls, v: Optional[list[str]]) -> Optional[list[str]]:
+        if v is None:
+            return v
+
+        allowed = {"admin", "tenant_admin", "tenant_user"}
+        invalid = [role for role in v if role not in allowed]
+        if invalid:
+            raise ValueError(f"Invalid roles: {', '.join(invalid)}")
         return v
 
 

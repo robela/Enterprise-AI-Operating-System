@@ -2,7 +2,8 @@ import axios, { type AxiosError } from "axios";
 
 // Use the frontend's same-origin API proxy by default so client bundles do not
 // bake in a deployment-specific backend host at build time.
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL?.trim() || "";
+const BACKEND_URL =
+  typeof window === "undefined" ? process.env.NEXT_PUBLIC_BACKEND_URL?.trim() || "" : "";
 
 export const apiClient = axios.create({
   baseURL: BACKEND_URL,
@@ -14,8 +15,12 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
     const token = localStorage.getItem("token");
+    const tenantId = localStorage.getItem("tenant_id");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    if (tenantId) {
+      config.headers["X-Tenant-ID"] = tenantId;
     }
   }
   return config;

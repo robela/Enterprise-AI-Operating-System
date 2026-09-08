@@ -66,6 +66,7 @@ class Settings(BaseSettings):
 
     # Storage
     storage_backend: str = Field("s3", alias="STORAGE_BACKEND")
+    local_storage_path: str = Field("./.data/storage", alias="LOCAL_STORAGE_PATH")
     aws_access_key_id: str = Field("", alias="AWS_ACCESS_KEY_ID")
     aws_secret_access_key: str = Field("", alias="AWS_SECRET_ACCESS_KEY")
     aws_region: str = Field("us-east-1", alias="AWS_REGION")

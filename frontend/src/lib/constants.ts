@@ -6,4 +6,4 @@ export const ROLE_PERMISSIONS = {
   callAgent: ["view_chat"],
 } as const;
 
-export const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8060";
+export const API_BASE = typeof window === "undefined" ? process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8060" : "";

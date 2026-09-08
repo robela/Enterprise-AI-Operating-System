@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/utils/auth";
 import type { UserRole } from "@/utils/types";
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 
 interface ProtectedComponentProps {
   children: ReactNode;
@@ -17,15 +17,26 @@ export function ProtectedComponent({
   const { token, role, isLoading } = useAuth();
   const router = useRouter();
 
+  useEffect(() => {
+    if (isLoading) return;
+
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+
+    if (role && !authorizedRoles.includes(role)) {
+      router.replace("/chat");
+    }
+  }, [authorizedRoles, isLoading, role, router, token]);
+
   if (isLoading) return null;
 
   if (!token) {
-    router.replace("/login");
     return null;
   }
 
   if (role && !authorizedRoles.includes(role)) {
-    router.replace("/chat");
     return null;
   }
 

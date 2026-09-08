@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.database.session import get_db
 from backend.core.security.oauth2 import get_current_user, CurrentUser
+from backend.core.exceptions.base import ForbiddenException, ValidationException
 from backend.domains.users.api.schemas import (
     UserCreateRequest,
     UserUpdateRequest,
@@ -30,12 +31,23 @@ async def create_user(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[UserService, Depends(get_user_service)],
 ):
+    requested_roles = body.roles or ["tenant_user"]
+    requested_tenant_id = (body.tenant_id or "").strip()
+
+    if any(role in {"tenant_admin", "tenant_user"} for role in requested_roles) and not requested_tenant_id:
+        raise ValidationException("tenant_id is required for tenant roles")
+
+    target_tenant_id = requested_tenant_id or current_user.tenant_id
+
+    if target_tenant_id != current_user.tenant_id and not current_user.has_role("admin"):
+        raise ForbiddenException("Only admin can create users in other tenants")
+
     user = await service.create_user(
-        tenant_id=current_user.tenant_id,
+        tenant_id=target_tenant_id,
         email=body.email,
         full_name=body.full_name,
         password=body.password,
-        roles=body.roles,
+        roles=requested_roles,
     )
     return UserResponse.from_domain(user)
 

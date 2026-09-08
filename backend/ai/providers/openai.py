@@ -11,7 +11,7 @@ class OpenAIProvider(BaseAIProvider):
     provider_name = "openai"
 
     def __init__(self):
-        self._client = AsyncOpenAI(api_key=settings.openai_api_key)
+        self._client = None  # Lazy load
         self._model = settings.openai_model
         self._embedding_model = settings.embedding_model
 
@@ -22,6 +22,15 @@ class OpenAIProvider(BaseAIProvider):
         max_tokens: int = 2048,
         **kwargs,
     ) -> ChatResponse:
+        if not settings.openai_api_key:
+            # Fallback to mock provider if no API key
+            from backend.ai.providers.mock import MockProvider
+            mock = MockProvider()
+            return await mock.chat(messages, temperature, max_tokens, **kwargs)
+        
+        if self._client is None:
+            self._client = AsyncOpenAI(api_key=settings.openai_api_key)
+        
         response = await self._client.chat.completions.create(
             model=self._model,
             messages=[{"role": m.role, "content": m.content} for m in messages],
