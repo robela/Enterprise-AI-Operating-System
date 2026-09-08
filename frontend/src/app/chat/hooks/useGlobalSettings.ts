@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import api from "@/utils/api";
+import { apiClient } from "@/services/api/client";
 
 interface GlobalSettings {
   sttEnabled: boolean;
@@ -15,10 +15,8 @@ export function useGlobalSettings(token: string | null): GlobalSettings {
 
   useEffect(() => {
     if (!token) return;
-    api
-      .get("/settings/", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+    apiClient
+      .get("/api/v1/settings/global")
       .then((res) => {
         setSettings({
           sttEnabled: res.data.stt_enabled ?? true,
