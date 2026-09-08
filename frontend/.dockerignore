@@ -2,3 +2,5 @@ node_modules
 .next
 .env.local
 *.log
+src.backup
+src/app/(core).bak
