@@ -75,6 +75,13 @@ secrets/
 *.db
 *.sqlite
 *.sqlite3
+*.db-shm
+*.db-wal
+
+# Local backup and scratch folders
+.data/
+frontend/src.backup/
+frontend/src/app/(core).bak/
 
 # Node / Next.js
 node_modules/
