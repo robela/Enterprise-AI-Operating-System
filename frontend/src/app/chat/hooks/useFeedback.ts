@@ -31,6 +31,15 @@ interface UseFeedbackProps {
   token: string | null;
 }
 
+const createDefaultFeedbackState = (): FeedbackState => ({
+  liked: null,
+  showFeedbackOptions: false,
+  feedbackId: null,
+  selectedFeedback: [],
+  likeDislikeButtonsRemoved: false,
+  categoricalOptionsRemoved: false,
+});
+
 export function useFeedback({ token }: UseFeedbackProps) {
   const [feedbackStates, setFeedbackStates] = useState<Record<number, FeedbackState>>({});
 
@@ -45,28 +54,34 @@ export function useFeedback({ token }: UseFeedbackProps) {
 
       if (isLike) {
         // Like: Remove all buttons and show confirmation
-        setFeedbackStates(prev => ({
-          ...prev,
-          [messageId]: {
-            ...prev[messageId],
-            liked: true,
-            likeDislikeButtonsRemoved: true,
-            showFeedbackOptions: false,
-            feedbackId: response.saved_feedback_id,
-          }
-        }));
+        setFeedbackStates((prev) => {
+          const current = prev[messageId] ?? createDefaultFeedbackState();
+          return {
+            ...prev,
+            [messageId]: {
+              ...current,
+              liked: true,
+              likeDislikeButtonsRemoved: true,
+              showFeedbackOptions: false,
+              feedbackId: response.saved_feedback_id,
+            },
+          };
+        });
       } else {
         // Dislike: Remove like/dislike buttons, show categorical options (
-        setFeedbackStates(prev => ({
-          ...prev,
-          [messageId]: {
-            ...prev[messageId],
-            liked: false,
-            likeDislikeButtonsRemoved: true,
-            showFeedbackOptions: true,
-            feedbackId: response.saved_feedback_id,
-          }
-        }));
+        setFeedbackStates((prev) => {
+          const current = prev[messageId] ?? createDefaultFeedbackState();
+          return {
+            ...prev,
+            [messageId]: {
+              ...current,
+              liked: false,
+              likeDislikeButtonsRemoved: true,
+              showFeedbackOptions: true,
+              feedbackId: response.saved_feedback_id,
+            },
+          };
+        });
       }
     } catch (error) {
       console.error("Error submitting feedback:", error);
@@ -88,7 +103,8 @@ export function useFeedback({ token }: UseFeedbackProps) {
       const selectedOption = FEEDBACK_OPTIONS.find(opt => opt.value === feedbackType);
       const selectedGroup = selectedOption?.group;
 
-      setFeedbackStates(prev => {
+      setFeedbackStates((prev) => {
+        const current = prev[messageId] ?? createDefaultFeedbackState();
         const currentFeedback = prev[messageId]?.selectedFeedback || [];
         let updatedFeedback = [...currentFeedback];
 
@@ -107,9 +123,9 @@ export function useFeedback({ token }: UseFeedbackProps) {
         return {
           ...prev,
           [messageId]: {
-            ...prev[messageId],
+            ...current,
             selectedFeedback: updatedFeedback,
-          }
+          },
         };
       });
 
@@ -122,16 +138,9 @@ export function useFeedback({ token }: UseFeedbackProps) {
 
   // Initialize feedback state for a new message
   const initializeFeedbackState = useCallback((messageId: number) => {
-    setFeedbackStates(prev => ({
+    setFeedbackStates((prev) => ({
       ...prev,
-      [messageId]: {
-        liked: null,
-        showFeedbackOptions: false,
-        feedbackId: null,
-        selectedFeedback: [],
-        likeDislikeButtonsRemoved: false,
-        categoricalOptionsRemoved: false,
-      }
+      [messageId]: createDefaultFeedbackState(),
     }));
   }, []);
 
