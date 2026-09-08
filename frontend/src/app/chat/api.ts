@@ -246,6 +246,16 @@ export const submitDecisionSurvey = async (
   return { status: "ok" };
 };
 
+export const getPDFFile = async (params: {
+  token: string;
+  document_id: number;
+}): Promise<Blob> => {
+  const { data } = await client.get(`/api/v1/documents/${params.document_id}/download`, {
+    responseType: "blob",
+  });
+  return data as Blob;
+};
+
 // ─── Feedback ────────────────────────────────────────────────────────────────
 
 export const submitLikeFeedback = async (

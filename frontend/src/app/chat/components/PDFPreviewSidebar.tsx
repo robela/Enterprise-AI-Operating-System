@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { X, ChevronLeft, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getPDFFile } from "../../(admin)/documents/api";
+import { getPDFFile } from "../api";
 
 interface PDFPreviewSidebarProps {
   isOpen: boolean;
