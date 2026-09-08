@@ -3,7 +3,6 @@ import type { User } from "@/types/user";
 function formatRole(role: User["role"]): string {
   if (role === "tenant_admin") return "Tenant Admin";
   if (role === "tenant_user") return "Tenant User";
-  if (role === "callAgent") return "Call Agent";
   if (role === "admin") return "Admin";
   return "Tenant User";
 }
