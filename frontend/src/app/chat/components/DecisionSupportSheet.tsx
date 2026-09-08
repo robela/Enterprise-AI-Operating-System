@@ -465,8 +465,8 @@ function StepProgram({
   onContinue,
 }: {
   programs: ProgramOption[];
-  selected: { id: number; name: string } | null;
-  onRowClick: (p: { id: number; name: string } | null) => void;
+  selected: { id: number | string; name: string } | null;
+  onRowClick: (p: { id: number | string; name: string } | null) => void;
   onSkip: () => void;
   onContinue: () => void;
 }) {
@@ -547,7 +547,7 @@ function StepProgram({
               </tr>
             ) : (
               paginated.map((p) => {
-                const isSelected = selected?.id === p.program_id;
+                const isSelected = String(selected?.id) === String(p.program_id);
                 return (
                   <tr
                     key={p.program_id}

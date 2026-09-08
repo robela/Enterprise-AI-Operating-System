@@ -50,7 +50,7 @@ export interface DSSelections {
   languagePref: string | null;
   actionTaken: "managed" | "referred" | null;
   intentChanged: boolean | null;
-  program: { id: number; name: string } | null;
+  program: { id: number | string; name: string } | null;
   tag: { id: number; name: string } | null;
 }
 
@@ -144,7 +144,7 @@ export function useDecisionSupport({ token }: UseDecisionSupportProps) {
     []
   );
   const setProgramOnly = useCallback(
-    (program: { id: number; name: string } | null) =>
+    (program: { id: number | string; name: string } | null) =>
       setSelections((prev) => ({ ...prev, program })),
     []
   );
