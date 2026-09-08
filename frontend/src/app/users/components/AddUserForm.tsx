@@ -70,8 +70,9 @@ export function AddUserForm({ onSuccess }: AddUserFormProps) {
           });
           const options = Array.isArray(data) ? data : [];
           setTenantOptions(options);
-          if (!watch("tenant_id") && options.length) {
-            setValue("tenant_id", options[0].tenant_id);
+          const firstOption = options[0];
+          if (!watch("tenant_id") && firstOption) {
+            setValue("tenant_id", firstOption.tenant_id);
           }
         } else if (currentTenantId) {
           setTenantOptions([{ tenant_id: currentTenantId, name: currentTenantId }]);
