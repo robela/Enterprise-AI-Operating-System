@@ -50,6 +50,13 @@ class ChatResponse(BaseModel):
     agent: str = ""
     requires_human_review: bool = False
     trace: list[dict] | None = None
+    completeness: "CompletenessMetadata | None" = None
+
+
+class CompletenessMetadata(BaseModel):
+    workflow_id: str | None = None
+    missing_fields: list[str] = []
+    source_pages: list[int] = []
 
 
 class Conversation(BaseModel):
@@ -210,12 +217,25 @@ async def chat(
             if tenant_org and isinstance(tenant_org.settings, dict):
                 tenant_settings = tenant_org.settings
 
+            history_result = await db.execute(
+                select(MessageModel.role, MessageModel.content)
+                .where(
+                    MessageModel.conversation_id == conversation.conversation_id,
+                    MessageModel.role == "user",
+                )
+                .order_by(MessageModel.created_at)
+            )
+            conversation_history = [
+                {"role": role, "content": content}
+                for role, content in history_result.all()
+            ]
+
             orchestrator = OrchestratorAgent()
             context = AgentContext(
                 user_query=message,
                 tenant_id=current_user.tenant_id,
                 user_id=current_user.user_id,
-                conversation_history=body.conversation_history,
+                conversation_history=conversation_history or body.conversation_history,
                 metadata={"tenant_settings": tenant_settings},
             )
             result = await orchestrator.run(context)
@@ -251,6 +271,14 @@ async def chat(
             agent=agent_name,
             requires_human_review=requires_human_review,
             trace=trace,
+            completeness=(
+                CompletenessMetadata(
+                    workflow_id=result.metadata.get("workflow_id"),
+                    missing_fields=result.metadata.get("missing_fields", []),
+                    source_pages=result.metadata.get("source_pages", []),
+                )
+                if agent_name == "completeness" else None
+            ),
         )
     except HTTPException:
         raise

@@ -14,6 +14,7 @@ import VideoSegmentDisplay from "./VideoSegmentDisplay";
 import Citations from "./Citations";
 import FeedbackButtons from "./FeedbackButtons";
 import ReadAloudButton from "./ReadAloudButton";
+import ClinicalFollowUpForm from "./ClinicalFollowUpForm";
 
 interface FeedbackState {
   liked: boolean | null;
@@ -38,6 +39,7 @@ interface ChatMessageProps {
   isEditing?: boolean;
   onStartEdit?: (messageId: number) => void;
   onCancelEdit?: () => void;
+  onSubmitClinicalFollowUp?: (text: string) => void;
   isCallAgent?: boolean;
   disabled?: boolean;
   ttsEnabled?: boolean;
@@ -57,6 +59,7 @@ export default function ChatMessage({
   isEditing = false,
   onStartEdit,
   onCancelEdit,
+  onSubmitClinicalFollowUp,
   isCallAgent,
   disabled = false,
   ttsEnabled = true,
@@ -200,6 +203,14 @@ export default function ChatMessage({
               {message.text}
             </ReactMarkdown>
           </div>
+        )}
+
+        {!isUser && message.completeness && message.completeness.missing_fields.length > 0 && onSubmitClinicalFollowUp && (
+          <ClinicalFollowUpForm
+            missingFields={message.completeness.missing_fields}
+            disabled={disabled}
+            onSubmit={onSubmitClinicalFollowUp}
+          />
         )}
 
         {/* Images */}

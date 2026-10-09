@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 
 from qdrant_client import AsyncQdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
 
 from backend.ai.rag.chunker import Chunk
 from backend.core.config.settings import settings
@@ -66,3 +66,21 @@ class QdrantStore:
             )
             for r in results
         ]
+
+    async def delete_document(self, document_id: str) -> None:
+        await self._client.delete(
+            collection_name=self._collection,
+            points_selector=Filter(
+                must=[
+                    FieldCondition(
+                        key="document_id",
+                        match=MatchValue(value=document_id),
+                    ),
+                    FieldCondition(
+                        key="tenant_id",
+                        match=MatchValue(value=self.tenant_id),
+                    ),
+                ]
+            ),
+            wait=True,
+        )

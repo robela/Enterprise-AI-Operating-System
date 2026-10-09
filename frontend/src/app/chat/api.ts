@@ -12,6 +12,18 @@ client.interceptors.request.use((cfg) => {
   return cfg;
 });
 
+client.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && typeof window !== "undefined") {
+      localStorage.removeItem("token");
+      localStorage.removeItem("tenant_id");
+      window.location.href = "/login";
+    }
+    return Promise.reject(error);
+  },
+);
+
 // ─── Chat ────────────────────────────────────────────────────────────────────
 
 interface GetChatResponseParams {
@@ -78,6 +90,7 @@ export const getChatResponse = async (params: GetChatResponseParams): Promise<Me
     request_id: 0,
     tracer_json: data.trace || {},
     response_metadata: { chunks: {} },
+    completeness: data.completeness,
     images: [],
     video_segments: [],
     timestamp: new Date(),

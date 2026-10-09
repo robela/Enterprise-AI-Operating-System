@@ -14,6 +14,8 @@ class DocumentStatus(str, Enum):
 
 
 class DocumentType(str, Enum):
+    PRIMARY = "primary"
+    SECONDARY = "secondary"
     PDF = "pdf"
     WORD = "word"
     EXCEL = "excel"
@@ -21,6 +23,11 @@ class DocumentType(str, Enum):
     MARKDOWN = "markdown"
     HTML = "html"
     OTHER = "other"
+
+
+class DocumentLifecycleStatus(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
 
 
 @dataclass
@@ -33,6 +40,7 @@ class Document:
     content_type: str
     size_bytes: int
     doc_type: DocumentType = DocumentType.OTHER
+    lifecycle_status: DocumentLifecycleStatus = DocumentLifecycleStatus.ACTIVE
     status: DocumentStatus = DocumentStatus.PENDING
     chunk_count: int = 0
     metadata: dict = field(default_factory=dict)
@@ -49,6 +57,8 @@ class Document:
         storage_path: str,
         content_type: str,
         size_bytes: int,
+        doc_type: DocumentType = DocumentType.OTHER,
+        lifecycle_status: DocumentLifecycleStatus = DocumentLifecycleStatus.ACTIVE,
     ) -> Document:
         return cls(
             document_id=str(uuid.uuid4()),
@@ -58,6 +68,8 @@ class Document:
             storage_path=storage_path,
             content_type=content_type,
             size_bytes=size_bytes,
+            doc_type=doc_type,
+            lifecycle_status=lifecycle_status,
         )
 
     def mark_processing(self) -> None:
@@ -71,4 +83,38 @@ class Document:
 
     def mark_failed(self) -> None:
         self.status = DocumentStatus.FAILED
+        self.updated_at = datetime.now(timezone.utc)
+
+    def replace_file(
+        self,
+        *,
+        filename: str,
+        storage_path: str,
+        content_type: str,
+        size_bytes: int,
+        doc_type: DocumentType | None = None,
+        lifecycle_status: DocumentLifecycleStatus | None = None,
+    ) -> None:
+        self.filename = filename
+        self.storage_path = storage_path
+        self.content_type = content_type
+        self.size_bytes = size_bytes
+        if doc_type is not None:
+            self.doc_type = doc_type
+        if lifecycle_status is not None:
+            self.lifecycle_status = lifecycle_status
+        self.status = DocumentStatus.PENDING
+        self.chunk_count = 0
+        self.updated_at = datetime.now(timezone.utc)
+
+    def update_metadata(
+        self,
+        *,
+        doc_type: DocumentType | None = None,
+        lifecycle_status: DocumentLifecycleStatus | None = None,
+    ) -> None:
+        if doc_type is not None:
+            self.doc_type = doc_type
+        if lifecycle_status is not None:
+            self.lifecycle_status = lifecycle_status
         self.updated_at = datetime.now(timezone.utc)

@@ -168,6 +168,16 @@ export function useChat({ token, userId, isAdmin }: UseChatProps) {
     await sendText(text, { useReference, documentModuleId, documentProgramId, sector });
   };
 
+  const sendClinicalFollowUp = async (
+    text: string,
+    useReference: boolean,
+    documentModuleId: string,
+    documentProgramId: string,
+    sector: string | null = null,
+  ) => {
+    await sendText(text, { useReference, documentModuleId, documentProgramId, sector });
+  };
+
   const editAndResend = async (
     messageId: number,
     newText: string,
@@ -274,6 +284,7 @@ export function useChat({ token, userId, isAdmin }: UseChatProps) {
     clearChat,
     cancelGeneration,
     handleSendMessage,
+    sendClinicalFollowUp,
     handleTranscribeAudio,
     editAndResend,
     handleShowTrace,

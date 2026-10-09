@@ -1,0 +1,1 @@
+"""Approved-rule and PDF-evidence helpers for completeness checks."""

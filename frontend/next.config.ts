@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
   output: process.env.NODE_ENV === "production" ? "standalone" : undefined,
   outputFileTracingRoot: path.resolve(__dirname),
   reactStrictMode: true,
+  pageExtensions: ["tsx", "ts", "jsx", "js"],
+  typescript: {
+    tsconfigPath: "./tsconfig.next.json",
+  },
   images: {
     remotePatterns: [
       {

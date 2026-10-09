@@ -131,6 +131,51 @@ class PgVectorStore:
                 )
             await session.commit()
 
+    async def delete_document(self, document_id: str) -> None:
+        from sqlalchemy import text
+
+        if settings.database_url.startswith("sqlite"):
+            attempts = 4
+            for attempt in range(attempts):
+                try:
+                    async with AsyncSessionLocal() as session:
+                        await self._ensure_sqlite_table(session)
+                        await session.execute(
+                            text(
+                                """
+                                DELETE FROM document_chunks
+                                WHERE tenant_id = :tenant_id AND document_id = :document_id
+                                """
+                            ),
+                            {
+                                "tenant_id": self.tenant_id,
+                                "document_id": document_id,
+                            },
+                        )
+                        await session.commit()
+                        return
+                except OperationalError as exc:
+                    if self._is_sqlite_locked(exc) and attempt < attempts - 1:
+                        await asyncio.sleep(0.05 * (2**attempt))
+                        continue
+                    raise
+            return
+
+        async with AsyncSessionLocal() as session:
+            await session.execute(
+                text(
+                    """
+                    DELETE FROM document_chunks
+                    WHERE tenant_id = :tenant_id AND document_id = :document_id
+                    """
+                ),
+                {
+                    "tenant_id": self.tenant_id,
+                    "document_id": document_id,
+                },
+            )
+            await session.commit()
+
     async def search(self, query_embedding: list[float], top_k: int = 5) -> list[Chunk]:
         from sqlalchemy import text
 

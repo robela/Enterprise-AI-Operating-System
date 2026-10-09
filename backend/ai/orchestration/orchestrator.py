@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import structlog
+import re
 
 from backend.ai.agents.base_agent import AgentContext, AgentResult
 from backend.ai.agents.knowledge_agent import KnowledgeAgent
 from backend.ai.agents.validation_agent import ValidationAgent
 from backend.ai.agents.translation_agent import TranslationAgent
+from backend.ai.agents.completeness_agent import CompletenessAgent
 
 logger = structlog.get_logger(__name__)
 
@@ -23,6 +25,7 @@ class OrchestratorAgent:
         self._knowledge = KnowledgeAgent()
         self._validation = ValidationAgent()
         self._translation = TranslationAgent()
+        self._completeness = CompletenessAgent()
 
     async def run(self, context: AgentContext) -> AgentResult:
         logger.info("orchestrator_run", user_query=context.user_query[:80])
@@ -32,6 +35,8 @@ class OrchestratorAgent:
 
         if intent == "knowledge":
             return await self._knowledge.run(context)
+        if intent == "completeness":
+            return await self._completeness.run(context)
         if intent == "validation":
             return await self._validation.run(context)
         if intent == "translation":
@@ -45,6 +50,21 @@ class OrchestratorAgent:
         q = context.user_query.lower()
         if any(w in q for w in ["translate", "translation", "in french", "in spanish"]):
             return "translation"
+        if any(phrase in q for phrase in ["missing information", "missing questions", "missed questions", "check missing", "check missed"]):
+            return "completeness"
+        if "child" in q and re.search(
+            r"\b(?:cough|fever|diarrh(?:ea|oea)|vomiting|difficulty breathing|breathing problem)\b", q
+        ):
+            return "completeness"
+        if any(q.startswith(field) for field in [
+            "child's age:",
+            "general danger signs:",
+            "main symptoms:",
+            "nutrition or feeding status:",
+            "immunization status:",
+            "other problems:",
+        ]):
+            return "completeness"
         if any(w in q for w in ["validate", "check", "verify", "is valid"]):
             return "validation"
         return "knowledge"

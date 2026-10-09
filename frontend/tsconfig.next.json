@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "exclude": [
+    "node_modules",
+    "src.backup/**",
+    "src/app/*core*.bak/**",
+    "src/app/**/*.bak/**",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/*.spec.ts",
+    "src/**/*.spec.tsx",
+    "**/*.bak",
+    "**/*.bak/**"
+  ]
+}

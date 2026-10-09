@@ -114,6 +114,16 @@ export default function ChatInterface() {
     );
   };
 
+  const handleClinicalFollowUp = (text: string) => {
+    void chat.sendClinicalFollowUp(
+      text,
+      settings.useReference,
+      settings.documentModuleId,
+      settings.documentProgramId,
+      activeSector,
+    );
+  };
+
   const handleEditMessage = (messageId: number, newText: string) => {
     setEditingMessageId(null);
     chat.editAndResend(messageId, newText, settings.useReference, settings.documentModuleId, settings.documentProgramId, activeSector);
@@ -170,6 +180,7 @@ export default function ChatInterface() {
                   onOpenSurvey={survey.openSurvey}
                   onOpenDecisionSupport={handleOpenDecisionSupport}
                   onEditMessage={handleEditMessage}
+                  onSubmitClinicalFollowUp={handleClinicalFollowUp}
                   isEditing={editingMessageId === message.id}
                   onStartEdit={setEditingMessageId}
                   onCancelEdit={() => setEditingMessageId(null)}

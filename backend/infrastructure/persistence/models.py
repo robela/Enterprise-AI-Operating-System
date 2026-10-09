@@ -101,6 +101,27 @@ class DocumentModel(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class ExtractedWorkflowModel(Base):
+    """A reviewable workflow draft extracted from a tenant document."""
+    __tablename__ = "extracted_workflows"
+
+    workflow_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(String(36), index=True, nullable=False)
+    document_id: Mapped[str] = mapped_column(String(36), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    workflow_type: Mapped[str] = mapped_column(String(50), default="assessment", nullable=False)
+    steps: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    required_fields: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    source_pages: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    source_excerpt: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    confidence: Mapped[str] = mapped_column(String(20), default="medium", nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False, index=True)
+    reviewed_by: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class WorkflowModel(Base):
     __tablename__ = "workflows"
 

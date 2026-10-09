@@ -1,6 +1,10 @@
 """Document service — upload, index, search."""
 from backend.core.exceptions.base import NotFoundException
-from backend.domains.documents.domain.entities.document import Document
+from backend.domains.documents.domain.entities.document import (
+    Document,
+    DocumentLifecycleStatus,
+    DocumentType,
+)
 from backend.domains.documents.domain.repositories.document_repository import DocumentRepository
 
 
@@ -16,6 +20,8 @@ class DocumentService:
         storage_path: str,
         content_type: str,
         size_bytes: int,
+        doc_type: DocumentType = DocumentType.OTHER,
+        lifecycle_status: DocumentLifecycleStatus = DocumentLifecycleStatus.ACTIVE,
     ) -> Document:
         doc = Document.create(
             tenant_id=tenant_id,
@@ -24,6 +30,8 @@ class DocumentService:
             storage_path=storage_path,
             content_type=content_type,
             size_bytes=size_bytes,
+            doc_type=doc_type,
+            lifecycle_status=lifecycle_status,
         )
         await self._repo.save(doc)
         return doc
@@ -41,6 +49,41 @@ class DocumentService:
 
     async def delete(self, document_id: str, tenant_id: str) -> None:
         await self._repo.delete(document_id, tenant_id)
+
+    async def replace_file(
+        self,
+        document_id: str,
+        tenant_id: str,
+        filename: str,
+        storage_path: str,
+        content_type: str,
+        size_bytes: int,
+        doc_type: DocumentType | None = None,
+        lifecycle_status: DocumentLifecycleStatus | None = None,
+    ) -> Document:
+        doc = await self.get(document_id, tenant_id)
+        doc.replace_file(
+            filename=filename,
+            storage_path=storage_path,
+            content_type=content_type,
+            size_bytes=size_bytes,
+            doc_type=doc_type,
+            lifecycle_status=lifecycle_status,
+        )
+        await self._repo.save(doc)
+        return doc
+
+    async def update_metadata(
+        self,
+        document_id: str,
+        tenant_id: str,
+        doc_type: DocumentType | None = None,
+        lifecycle_status: DocumentLifecycleStatus | None = None,
+    ) -> Document:
+        doc = await self.get(document_id, tenant_id)
+        doc.update_metadata(doc_type=doc_type, lifecycle_status=lifecycle_status)
+        await self._repo.save(doc)
+        return doc
 
     async def mark_processing(self, document_id: str, tenant_id: str) -> Document:
         doc = await self.get(document_id, tenant_id)

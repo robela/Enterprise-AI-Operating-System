@@ -39,6 +39,11 @@ class RAGPipeline:
         logger.info("rag_ingested", document_id=document_id, chunk_count=len(chunks))
         return len(chunks)
 
+    async def delete_document(self, document_id: str) -> None:
+        """Delete all indexed chunks for a document."""
+        await self._retriever.delete_document(document_id)
+        logger.info("rag_document_deleted", document_id=document_id)
+
     async def query(
         self,
         question: str,

@@ -16,6 +16,12 @@ interface ChatVideoSegment {
   end_sec: number;
 }
 
+interface CompletenessMetadata {
+  workflow_id?: string;
+  missing_fields: string[];
+  source_pages: number[];
+}
+
 interface Message {
   id: number;
   text: string;
@@ -33,6 +39,7 @@ interface Message {
   images?: ChatImage[];
   video_segments?: ChatVideoSegment[];
   original_language?: string;
+  completeness?: CompletenessMetadata;
   timestamp: Date;
   audioUrl?: string;
 }
@@ -71,4 +78,4 @@ interface ConversationListResponse {
   total_count: number;
 }
 
-export type { Message, TracerData, ChatImage, ChatVideoSegment, ConversationSummary, ConversationListResponse };
+export type { Message, TracerData, ChatImage, ChatVideoSegment, CompletenessMetadata, ConversationSummary, ConversationListResponse };

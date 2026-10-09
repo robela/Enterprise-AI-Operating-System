@@ -27,6 +27,12 @@ class VectorRetriever:
             return await self._retrieve_qdrant(query_embedding, top_k)
         return await self._retrieve_pgvector(query_embedding, top_k)
 
+    async def delete_document(self, document_id: str) -> None:
+        if settings.vector_store == "qdrant":
+            await self._delete_qdrant(document_id)
+            return
+        await self._delete_pgvector(document_id)
+
     async def _store_pgvector(self, document_id, chunks, embeddings, metadata):
         from backend.ai.vectorstores.pgvector import PgVectorStore
         store = PgVectorStore(tenant_id=self.tenant_id)
@@ -46,3 +52,13 @@ class VectorRetriever:
         from backend.ai.vectorstores.qdrant import QdrantStore
         store = QdrantStore(tenant_id=self.tenant_id)
         return await store.search(query_embedding, top_k=top_k)
+
+    async def _delete_pgvector(self, document_id):
+        from backend.ai.vectorstores.pgvector import PgVectorStore
+        store = PgVectorStore(tenant_id=self.tenant_id)
+        await store.delete_document(document_id)
+
+    async def _delete_qdrant(self, document_id):
+        from backend.ai.vectorstores.qdrant import QdrantStore
+        store = QdrantStore(tenant_id=self.tenant_id)
+        await store.delete_document(document_id)

@@ -25,11 +25,13 @@ def process_document(self, document_id: str, tenant_id: str, storage_path: str):
 async def _async_process(document_id: str, tenant_id: str, storage_path: str):
     from backend.infrastructure.storage.factory import get_storage
     from backend.ai.rag.pipeline import RAGPipeline
+    from backend.ai.rag.text_extraction import extract_text
 
     storage = get_storage()
     # download() accepts both bare keys and full s3:// / gs:// URIs
     content_bytes = await storage.download(storage_path)
-    text = content_bytes.decode("utf-8", errors="ignore")
+    filename = storage_path.rsplit("/", 1)[-1]
+    text = extract_text(content_bytes, filename)
 
     pipeline = RAGPipeline(tenant_id=tenant_id)
     chunk_count = await pipeline.ingest(document_id=document_id, text=text)
