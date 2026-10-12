@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
+import axios from "axios";
 
 import {
   Sheet,
@@ -105,7 +106,13 @@ export function AddUserForm({ onSuccess }: AddUserFormProps) {
       reset();
       setOpen(false);
       onSuccess();
-    } catch {
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
+        const detail = error.response.data?.detail;
+        toast.error(typeof detail === "string" ? detail : "A user with this email already exists");
+        return;
+      }
+
       toast.error("Failed to create user");
     }
   };
