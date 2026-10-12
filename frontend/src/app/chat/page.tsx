@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { Suspense, useState, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ import { useSurvey } from "./hooks/useSurvey";
 import { useDecisionSupport } from "./hooks/useDecisionSupport";
 import { Message } from "./types";
 
-export default function ChatInterface() {
+function ChatInterface() {
   const [isClient, setIsClient] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
   const router = useRouter();
@@ -255,5 +255,13 @@ export default function ChatInterface() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading chat...</div>}>
+      <ChatInterface />
+    </Suspense>
   );
 }
