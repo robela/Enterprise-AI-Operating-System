@@ -30,7 +30,8 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    if (error.response?.status === 401 && typeof window !== "undefined") {
+    const isLoginRequest = error.config?.url?.includes("/api/v1/auth/token");
+    if (error.response?.status === 401 && !isLoginRequest && typeof window !== "undefined") {
       localStorage.removeItem("token");
       window.location.href = "/login";
     }
