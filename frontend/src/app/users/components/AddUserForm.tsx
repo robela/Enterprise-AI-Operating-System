@@ -108,8 +108,8 @@ export function AddUserForm({ onSuccess }: AddUserFormProps) {
       onSuccess();
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 409) {
-        const detail = error.response.data?.detail;
-        toast.error(typeof detail === "string" ? detail : "A user with this email already exists");
+        const message = error.response.data?.message;
+        toast.error(typeof message === "string" ? message : "A user with this email already exists");
         return;
       }
 
