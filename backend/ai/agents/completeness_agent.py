@@ -77,7 +77,10 @@ class CompletenessAgent(BaseAgent):
         if not missing_fields:
             answer = f"## Completeness check\n\nAll required fields in **{workflow.name}** are present.\n\nSource: document pages {source_pages}."
         else:
-            questions = [f"- {_FIELD_QUESTIONS.get(field, f'Please provide: {field.replace("_", " ")}.')}" for field in missing_fields]
+            questions = [
+                f"- {_FIELD_QUESTIONS.get(field, 'Please provide: ' + field.replace('_', ' ') + '.')}"
+                for field in missing_fields
+            ]
             answer = (
                 f"## Missing information\n\nBased on the approved **{workflow.name}** workflow, please provide:\n\n"
                 + "\n".join(questions)
