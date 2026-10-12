@@ -13,7 +13,7 @@ from backend.ai.rag.text_extraction import extract_pdf_pages, extract_text, get_
 from backend.ai.graph.completeness import extract_requirement_candidates
 from backend.ai.graph.workflow_extraction import extract_workflow_drafts
 from backend.core.database.session import get_db
-from backend.core.exceptions.base import ValidationException
+from backend.core.exceptions.base import ServiceUnavailableException, ValidationException
 from backend.core.security.oauth2 import get_current_user, CurrentUser
 from backend.domains.documents.application.services.document_service import DocumentService
 from backend.domains.documents.application.services.extracted_workflow_service import ExtractedWorkflowService
@@ -114,6 +114,16 @@ def _parse_lifecycle_status(value: str | None) -> DocumentLifecycleStatus:
         raise ValidationException(f"Invalid lifecycle_status {value!r}. Expected one of: {valid_values}") from exc
 
 
+async def _upload_to_storage(storage, key: str, content: bytes, content_type: str) -> str:
+    try:
+        return await storage.upload(key, content, content_type)
+    except Exception as exc:
+        logger.exception("document_storage_upload_failed", key=key, error=str(exc))
+        raise ServiceUnavailableException(
+            "Document storage is temporarily unavailable. Please try again later."
+        ) from exc
+
+
 @router.post("", status_code=201)
 async def upload_document(
     file: UploadFile = File(...),
@@ -130,7 +140,8 @@ async def upload_document(
     content = await file.read()
     key = f"{current_user.tenant_id}/documents/{file.filename}"
 
-    storage_path = await storage.upload(
+    storage_path = await _upload_to_storage(
+        storage,
         key,
         content,
         file.content_type or "application/octet-stream",
@@ -218,7 +229,8 @@ async def replace_document(
     old_storage_path = existing.storage_path
     key = f"{current_user.tenant_id}/documents/{document_id}/{file.filename}"
 
-    new_storage_path = await storage.upload(
+    new_storage_path = await _upload_to_storage(
+        storage,
         key,
         content,
         file.content_type or "application/octet-stream",

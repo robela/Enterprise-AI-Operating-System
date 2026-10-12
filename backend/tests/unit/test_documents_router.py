@@ -115,6 +115,31 @@ async def test_upload_document_indexes_and_persists(client, db_session, document
 
 
 @pytest.mark.asyncio
+async def test_upload_document_returns_service_unavailable_when_storage_fails(
+    client, document_dependency_stubs, monkeypatch
+) -> None:
+    from backend.api.rest import documents_router
+
+    async def fail_upload(*_args, **_kwargs) -> str:
+        raise RuntimeError("GCS bucket access denied")
+
+    monkeypatch.setattr(document_dependency_stubs["storage"], "upload", fail_upload)
+    token = _token(user_id="doc-user-storage-failure", tenant_id="tenant-doc-storage-failure")
+
+    response = await client.post(
+        "/api/v1/documents",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("notes.txt", b"hello from upload", "text/plain")},
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "error": "SERVICE_UNAVAILABLE",
+        "message": "Document storage is temporarily unavailable. Please try again later.",
+    }
+
+
+@pytest.mark.asyncio
 async def test_replace_document_reindexes_and_cleans_old_storage(client, db_session, document_dependency_stubs) -> None:
     token = _token(user_id="doc-user-2", tenant_id="tenant-doc-b")
 

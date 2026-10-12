@@ -45,6 +45,11 @@ class BadRequestException(AppException):
     error_code = "BAD_REQUEST"
 
 
+class ServiceUnavailableException(AppException):
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    error_code = "SERVICE_UNAVAILABLE"
+
+
 class TenantNotFoundException(NotFoundException):
     error_code = "TENANT_NOT_FOUND"
 
