@@ -129,7 +129,7 @@ export function DocumentTable({
                       <TooltipTrigger asChild>
                         <Button
                           type="button"
-                          variant="secondary"
+                          variant="outline"
                           size="icon"
                           aria-label="View"
                           onClick={() => onView(doc.document_id)}
