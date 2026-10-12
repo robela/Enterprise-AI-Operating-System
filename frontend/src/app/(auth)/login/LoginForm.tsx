@@ -7,9 +7,10 @@ import { z } from "zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/utils/auth";
 import { toast } from "sonner";
+import axios from "axios";
 
 const loginSchema = z.object({
-  username: z.string().min(1, "Username is required"),
+  username: z.string().email("Enter the email address used when the account was created"),
   password: z.string().min(1, "Password is required"),
   tenantId: z.string().min(1, "Tenant is required"),
 });
@@ -44,8 +45,16 @@ export function LoginForm() {
     try {
       await login(data.username, data.password, data.tenantId);
       router.push("/chat");
-    } catch {
-      toast.error("Invalid credentials. Please try again.");
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const message = error.response?.data?.message;
+        if (typeof message === "string") {
+          toast.error(message);
+          return;
+        }
+      }
+
+      toast.error("Unable to sign in. Check your email, password, and tenant.");
     }
   };
 
@@ -56,12 +65,12 @@ export function LoginForm() {
     >
       <div className="space-y-1">
         <label htmlFor="username" className="text-sm font-medium">
-          Username
+          Email
         </label>
         <input
           id="username"
-          type="text"
-          autoComplete="username"
+          type="email"
+          autoComplete="email"
           className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           {...register("username")}
         />
