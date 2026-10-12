@@ -1,6 +1,7 @@
 """Unit tests for the User domain."""
 import pytest
 
+from backend.domains.users.application.services.user_service import UserService
 from backend.domains.users.domain.entities.user import User, UserStatus
 from backend.domains.users.domain.value_objects.email import Email
 from backend.domains.users.domain.events.user_events import UserCreated, UserDeactivated
@@ -49,3 +50,21 @@ def test_user_update():
     user.update(full_name="David Updated", roles=["admin"])
     assert user.full_name == "David Updated"
     assert "admin" in user.roles
+
+
+@pytest.mark.asyncio
+async def test_administrator_created_user_is_active(db_session):
+    from backend.domains.users.infrastructure.persistence.user_repository_impl import (
+        SQLAlchemyUserRepository,
+    )
+
+    service = UserService(SQLAlchemyUserRepository(db_session))
+    user = await service.create_user(
+        tenant_id="tenant-1",
+        email="new-user@example.com",
+        full_name="New User",
+        password="strong-password",
+        roles=["tenant_user"],
+    )
+
+    assert user.status == UserStatus.ACTIVE

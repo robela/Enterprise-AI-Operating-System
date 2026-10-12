@@ -29,6 +29,7 @@ class UserService:
             hashed_password=hash_password(password),
             roles=roles,
         )
+        user.activate()
         await self._repo.save(user)
 
         for event in user.pop_events():
