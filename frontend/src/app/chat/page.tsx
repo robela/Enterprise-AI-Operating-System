@@ -139,7 +139,9 @@ function ChatInterface() {
     router.replace(`${pathname}?new=1&sector=${encodeURIComponent(activeSector)}`);
   };
 
-  if (!isClient) return null;
+  if (!isClient) {
+    return <div className="p-6 text-sm text-muted-foreground">Loading chat...</div>;
+  }
 
   return (
     <div className="flex h-full w-full bg-background overflow-hidden">
