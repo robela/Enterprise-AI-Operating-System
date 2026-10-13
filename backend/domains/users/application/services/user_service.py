@@ -77,5 +77,20 @@ class UserService:
 
         return user
 
+    async def activate_user_as_admin(self, user_id: str) -> User:
+        user = await self._repo.get_by_id_any_tenant(user_id)
+        if not user:
+            raise NotFoundException(f"User {user_id!r} not found")
+        user.activate()
+        await self._repo.save(user)
+
+        for event in user.pop_events():
+            await event_bus.publish(event)
+
+        return user
+
     async def list_users(self, tenant_id: str, skip: int = 0, limit: int = 50) -> list[User]:
         return await self._repo.list_by_tenant(tenant_id, skip=skip, limit=limit)
+
+    async def list_all_users(self, skip: int = 0, limit: int = 50) -> list[User]:
+        return await self._repo.list_all(skip=skip, limit=limit)

@@ -59,7 +59,10 @@ async def list_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
 ):
-    users = await service.list_users(current_user.tenant_id, skip=skip, limit=limit)
+    if current_user.has_role("admin"):
+        users = await service.list_all_users(skip=skip, limit=limit)
+    else:
+        users = await service.list_users(current_user.tenant_id, skip=skip, limit=limit)
     return UserListResponse(items=[UserResponse.from_domain(u) for u in users], total=len(users))
 
 
@@ -95,7 +98,10 @@ async def activate_user(
     if not current_user.has_role("admin", "tenant_admin"):
         raise ForbiddenException("Only administrators can activate users")
 
-    user = await service.activate_user(user_id, current_user.tenant_id)
+    if current_user.has_role("admin"):
+        user = await service.activate_user_as_admin(user_id)
+    else:
+        user = await service.activate_user(user_id, current_user.tenant_id)
     return UserResponse.from_domain(user)
 
 

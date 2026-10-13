@@ -9,6 +9,9 @@ class UserRepository(ABC):
     async def get_by_id(self, user_id: str, tenant_id: str) -> User | None: ...
 
     @abstractmethod
+    async def get_by_id_any_tenant(self, user_id: str) -> User | None: ...
+
+    @abstractmethod
     async def get_by_email(self, email: str, tenant_id: str) -> User | None: ...
 
     @abstractmethod
@@ -19,3 +22,6 @@ class UserRepository(ABC):
 
     @abstractmethod
     async def list_by_tenant(self, tenant_id: str, skip: int = 0, limit: int = 50) -> list[User]: ...
+
+    @abstractmethod
+    async def list_all(self, skip: int = 0, limit: int = 50) -> list[User]: ...
