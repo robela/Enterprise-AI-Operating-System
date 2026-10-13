@@ -45,7 +45,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 export default function DocumentsPage() {
-  const { tenant_id } = useAuth();
+  const { tenant_id, role } = useAuth();
 
   const [documents, setDocuments] = useState<TenantDocument[]>([]);
   const [tenantOptions, setTenantOptions] = useState<TenantListItem[]>([]);
@@ -259,6 +259,9 @@ export default function DocumentsPage() {
 
   const handleAddSidebarChange = (open: boolean) => {
     setShowAddDocSidebar(open);
+    if (open && role === "tenant_admin") {
+      setUploadTenantId(activeTenantId);
+    }
     if (!open) {
       setUploadTenantId("");
       setUploadFile(null);
@@ -646,6 +649,7 @@ export default function DocumentsPage() {
             tenantOptionsLoading={tenantOptionsLoading}
             activeTenantId={activeTenantId}
             uploadTenantId={uploadTenantId}
+            lockTenantSelection={role === "tenant_admin"}
             uploadFile={uploadFile}
             documentType={uploadDocumentType}
             lifecycleStatus={uploadLifecycleStatus}

@@ -10,6 +10,7 @@ type Props = {
   tenantOptionsLoading: boolean;
   activeTenantId: string;
   uploadTenantId: string;
+  lockTenantSelection: boolean;
   uploadFile: File | null;
   documentType: DocumentTypeValue | "";
   lifecycleStatus: LifecycleStatus;
@@ -27,6 +28,7 @@ export function AddDocumentSidebarContent({
   tenantOptionsLoading,
   activeTenantId,
   uploadTenantId,
+  lockTenantSelection,
   uploadFile,
   documentType,
   lifecycleStatus,
@@ -58,21 +60,25 @@ export function AddDocumentSidebarContent({
         <label htmlFor="upload-tenant-select" className="text-sm font-medium">
           Tenant <span className="text-rose-600">*</span>
         </label>
-        <select
-          id="upload-tenant-select"
-          className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          value={uploadTenantId}
-          onChange={(event) => onUploadTenantChange(event.target.value)}
-          required
-        >
-          <option value="">Select tenant</option>
-          {tenantOptions.map((tenant) => (
-            <option key={tenant.tenant_id} value={tenant.tenant_id}>
-              {tenant.tenant_id} ({tenant.name})
-            </option>
-          ))}
-        </select>
-        {tenantOptionsLoading && <p className="text-xs text-muted-foreground">Loading tenants...</p>}
+        {lockTenantSelection ? (
+          <p className="rounded-md border bg-muted px-3 py-2 text-sm">{activeTenantId}</p>
+        ) : (
+          <select
+            id="upload-tenant-select"
+            className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            value={uploadTenantId}
+            onChange={(event) => onUploadTenantChange(event.target.value)}
+            required
+          >
+            <option value="">Select tenant</option>
+            {tenantOptions.map((tenant) => (
+              <option key={tenant.tenant_id} value={tenant.tenant_id}>
+                {tenant.tenant_id} ({tenant.name})
+              </option>
+            ))}
+          </select>
+        )}
+        {!lockTenantSelection && tenantOptionsLoading && <p className="text-xs text-muted-foreground">Loading tenants...</p>}
       </div>
 
       {isTenantMismatch && (

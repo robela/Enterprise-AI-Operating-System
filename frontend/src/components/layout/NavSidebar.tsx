@@ -28,7 +28,7 @@ const navItems = [
     label: "Documents",
     href: "/documents",
     icon: FileText,
-    roles: ["admin"],
+    roles: ["admin", "tenant_admin"],
   },
   {
     label: "Audit",

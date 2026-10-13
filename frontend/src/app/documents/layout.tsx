@@ -7,7 +7,7 @@ export default function DocumentsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ProtectedComponent authorizedRoles={["admin"]}>
+    <ProtectedComponent authorizedRoles={["admin", "tenant_admin"]}>
       <div className="flex h-screen overflow-hidden">
         <NavSidebar />
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
