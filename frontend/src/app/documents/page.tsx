@@ -270,8 +270,10 @@ export default function DocumentsPage() {
     }
   };
 
+  const effectiveUploadTenantId = role === "tenant_admin" ? activeTenantId : uploadTenantId;
+
   const onUpload = async () => {
-    if (!uploadTenantId) {
+    if (!effectiveUploadTenantId) {
       toast.error("Tenant selection is required");
       return;
     }
@@ -291,7 +293,7 @@ export default function DocumentsPage() {
       return;
     }
 
-    if (uploadTenantId !== activeTenantId) {
+    if (effectiveUploadTenantId !== activeTenantId) {
       toast.error("Selected tenant does not match your signed-in tenant");
       return;
     }
@@ -451,7 +453,7 @@ export default function DocumentsPage() {
         isLoading={isLoading}
         onSearchChange={setSearchQuery}
         onRefresh={() => void fetchDocuments()}
-        onOpenAddDocument={() => setShowAddDocSidebar(true)}
+        onOpenAddDocument={() => handleAddSidebarChange(true)}
         onView={(documentId) => {
           setViewDocumentId(documentId);
           setViewTab("preview");
@@ -648,7 +650,7 @@ export default function DocumentsPage() {
             tenantOptions={tenantOptions}
             tenantOptionsLoading={tenantOptionsLoading}
             activeTenantId={activeTenantId}
-            uploadTenantId={uploadTenantId}
+            uploadTenantId={effectiveUploadTenantId}
             lockTenantSelection={role === "tenant_admin"}
             uploadFile={uploadFile}
             documentType={uploadDocumentType}
