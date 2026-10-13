@@ -96,6 +96,30 @@ async def test_administrator_created_user_can_log_in_immediately(db_session):
 
 
 @pytest.mark.asyncio
+async def test_tenant_admin_login_uses_their_stored_tenant(db_session):
+    from backend.domains.users.infrastructure.persistence.user_repository_impl import (
+        SQLAlchemyUserRepository,
+    )
+
+    repository = SQLAlchemyUserRepository(db_session)
+    await UserService(repository).create_user(
+        tenant_id="moh",
+        email="admin@moh.gov",
+        full_name="MOH Admin",
+        password="strong-password",
+        roles=["tenant_admin"],
+    )
+
+    tokens = await AuthService(repository).login(
+        email="admin@moh.gov",
+        password="strong-password",
+        tenant_id="default",
+    )
+
+    assert tokens["tenant_id"] == "moh"
+
+
+@pytest.mark.asyncio
 async def test_administrator_can_activate_existing_pending_user(db_session):
     from backend.domains.users.infrastructure.persistence.user_repository_impl import (
         SQLAlchemyUserRepository,

@@ -10,7 +10,8 @@ class AuthService:
         self._users = user_repository
 
     async def login(self, email: str, password: str, tenant_id: str) -> dict:
-        user = await self._users.get_by_email(email, tenant_id)
+        del tenant_id
+        user = await self._users.get_by_email_any_tenant(email)
         if not user:
             raise UnauthorizedException("Invalid credentials")
 
@@ -24,7 +25,7 @@ class AuthService:
         await self._users.save(user)
 
         extra_claims = {
-            "tenant_id": tenant_id,
+            "tenant_id": user.tenant_id,
             "roles": user.roles,
             "scopes": self._roles_to_scopes(user.roles),
         }
@@ -35,6 +36,9 @@ class AuthService:
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
+            "tenant_id": user.tenant_id,
+            "user_id": user.user_id,
+            "username": str(user.email),
         }
 
     async def refresh(self, refresh_token: str) -> dict:

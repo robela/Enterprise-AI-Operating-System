@@ -125,13 +125,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
 
-    const { access_token, username: uname, user_id: uid, role: urole } = data;
+    const { access_token, username: uname, user_id: uid, role: urole, tenant_id: responseTenantId } = data;
     const resolvedRole = resolveRole(access_token, urole);
     const resolvedUserId = typeof uid === "string" ? uid : decodeAccessTokenPayload(access_token)?.sub ?? null;
+    const resolvedTenantId = typeof responseTenantId === "string" ? responseTenantId : tenantId;
 
     localStorage.setItem("token", access_token);
     localStorage.setItem("username", uname ?? usernameInput);
-    localStorage.setItem("tenant_id", tenantId);
+    localStorage.setItem("tenant_id", resolvedTenantId);
     if (resolvedRole) {
       localStorage.setItem("role", resolvedRole);
     } else {
@@ -145,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setToken(access_token);
     setUsername(uname ?? usernameInput);
-    setTenantId(tenantId);
+    setTenantId(resolvedTenantId);
     setRole(resolvedRole);
     setUserId(resolvedUserId);
   }, []);
