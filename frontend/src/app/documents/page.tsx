@@ -84,6 +84,7 @@ export default function DocumentsPage() {
 
   const tenantLabel = useMemo(() => tenant_id || "unknown", [tenant_id]);
   const activeTenantId = tenant_id ?? "";
+  const isTenantAdmin = role === "tenant_admin";
   const tenantName = useMemo(
     () => tenantOptions.find((tenant) => tenant.tenant_id === activeTenantId)?.name || tenantLabel,
     [activeTenantId, tenantLabel, tenantOptions],
@@ -259,7 +260,7 @@ export default function DocumentsPage() {
 
   const handleAddSidebarChange = (open: boolean) => {
     setShowAddDocSidebar(open);
-    if (open && role === "tenant_admin") {
+    if (open && isTenantAdmin) {
       setUploadTenantId(activeTenantId);
     }
     if (!open) {
@@ -270,10 +271,10 @@ export default function DocumentsPage() {
     }
   };
 
-  const effectiveUploadTenantId = role === "tenant_admin" ? activeTenantId : uploadTenantId;
+  const effectiveUploadTenantId = isTenantAdmin ? activeTenantId : uploadTenantId;
 
   const onUpload = async () => {
-    if (role !== "tenant_admin" && !effectiveUploadTenantId) {
+    if (!isTenantAdmin && !effectiveUploadTenantId) {
       toast.error("Tenant selection is required");
       return;
     }
@@ -288,12 +289,12 @@ export default function DocumentsPage() {
       return;
     }
 
-    if (role !== "tenant_admin" && !activeTenantId) {
+    if (!isTenantAdmin && !activeTenantId) {
       toast.error("No active tenant in session");
       return;
     }
 
-    if (role !== "tenant_admin" && effectiveUploadTenantId !== activeTenantId) {
+    if (!isTenantAdmin && effectiveUploadTenantId !== activeTenantId) {
       toast.error("Selected tenant does not match your signed-in tenant");
       return;
     }
@@ -642,7 +643,7 @@ export default function DocumentsPage() {
           <SheetHeader>
             <SheetTitle>Add Document</SheetTitle>
             <SheetDescription>
-              Select a document that the AI can use. Tenant selection is required before upload.
+              Select a document that the AI can use.
             </SheetDescription>
           </SheetHeader>
 
@@ -651,8 +652,8 @@ export default function DocumentsPage() {
             tenantOptionsLoading={tenantOptionsLoading}
             activeTenantId={activeTenantId}
             uploadTenantId={effectiveUploadTenantId}
-            lockTenantSelection={role === "tenant_admin"}
-            allowInheritedTenant={role === "tenant_admin"}
+            lockTenantSelection={isTenantAdmin}
+            allowInheritedTenant={isTenantAdmin}
             uploadFile={uploadFile}
             documentType={uploadDocumentType}
             lifecycleStatus={uploadLifecycleStatus}
