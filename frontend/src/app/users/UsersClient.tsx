@@ -10,7 +10,7 @@ import { UserTable } from "./components/UserTable";
 import { useUserManagement } from "./hooks/useUserManagement";
 
 export function UsersClient() {
-  const { users, isLoading, error, fetchUsers, deleteUser, activateUser } = useUserManagement();
+  const { users, isLoading, error, fetchUsers, deleteUser, activateUser, resetUserPassword } = useUserManagement();
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
   useEffect(() => {
@@ -35,6 +35,22 @@ export function UsersClient() {
     }
   };
 
+  const handleResetPassword = async (user: User) => {
+    const password = window.prompt(`Set a new password for ${user.email}`);
+    if (password === null) return;
+    if (password.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+
+    try {
+      await resetUserPassword(user.id, password);
+      toast.success("Password reset successfully");
+    } catch {
+      toast.error("Failed to reset password");
+    }
+  };
+
   if (error) {
     return <div className="text-destructive text-sm">Failed to load users: {error.message}</div>;
   }
@@ -51,6 +67,7 @@ export function UsersClient() {
         isLoading={isLoading}
         onEdit={setEditingUser}
         onActivate={handleActivate}
+        onResetPassword={handleResetPassword}
         onDelete={handleDelete}
       />
 

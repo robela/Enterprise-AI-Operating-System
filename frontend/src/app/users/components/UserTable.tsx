@@ -12,10 +12,11 @@ interface UserTableProps {
   isLoading: boolean;
   onEdit: (user: User) => void;
   onActivate: (userId: string) => void;
+  onResetPassword: (user: User) => void;
   onDelete: (userId: string) => void;
 }
 
-export function UserTable({ users, isLoading, onEdit, onActivate, onDelete }: UserTableProps) {
+export function UserTable({ users, isLoading, onEdit, onActivate, onResetPassword, onDelete }: UserTableProps) {
   if (isLoading) {
     return (
       <div className="border rounded-lg overflow-hidden">
@@ -96,6 +97,13 @@ export function UserTable({ users, isLoading, onEdit, onActivate, onDelete }: Us
                   className="text-xs px-3 py-1 rounded border hover:bg-accent transition-colors"
                 >
                   Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onResetPassword(user)}
+                  className="text-xs px-3 py-1 rounded border hover:bg-accent transition-colors"
+                >
+                  Reset password
                 </button>
                 <button
                   type="button"

@@ -120,6 +120,32 @@ async def test_tenant_admin_login_uses_their_stored_tenant(db_session):
 
 
 @pytest.mark.asyncio
+async def test_administrator_can_reset_user_password(db_session):
+    from backend.domains.users.infrastructure.persistence.user_repository_impl import (
+        SQLAlchemyUserRepository,
+    )
+
+    repository = SQLAlchemyUserRepository(db_session)
+    user = await UserService(repository).create_user(
+        tenant_id="moh",
+        email="admin@moh.gov",
+        full_name="MOH Admin",
+        password="original-password",
+        roles=["tenant_admin"],
+    )
+
+    await UserService(repository).reset_password_as_admin(user.user_id, "new-password")
+
+    tokens = await AuthService(repository).login(
+        email="admin@moh.gov",
+        password="new-password",
+        tenant_id="moh",
+    )
+
+    assert tokens["access_token"]
+
+
+@pytest.mark.asyncio
 async def test_administrator_can_activate_existing_pending_user(db_session):
     from backend.domains.users.infrastructure.persistence.user_repository_impl import (
         SQLAlchemyUserRepository,

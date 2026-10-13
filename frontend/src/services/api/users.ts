@@ -74,6 +74,11 @@ export const userService = {
     return normalizeUser(data as BackendUser);
   },
 
+  async resetPassword(id: string, password: string): Promise<User> {
+    const { data } = await apiClient.post(`/api/v1/users/${id}/reset-password`, { password });
+    return normalizeUser(data as BackendUser);
+  },
+
   async delete(id: string): Promise<void> {
     await apiClient.delete(`/api/v1/users/${id}`);
   },

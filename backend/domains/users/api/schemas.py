@@ -41,6 +41,17 @@ class UserUpdateRequest(BaseModel):
     roles: Optional[list[str]] = None
 
 
+class UserPasswordResetRequest(BaseModel):
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def strong_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+
 class UserResponse(BaseModel):
     user_id: str
     tenant_id: str

@@ -9,6 +9,7 @@ from backend.core.security.oauth2 import get_current_user, CurrentUser
 from backend.core.exceptions.base import ForbiddenException, ValidationException
 from backend.domains.users.api.schemas import (
     UserCreateRequest,
+    UserPasswordResetRequest,
     UserUpdateRequest,
     UserResponse,
     UserListResponse,
@@ -102,6 +103,20 @@ async def activate_user(
         user = await service.activate_user_as_admin(user_id)
     else:
         user = await service.activate_user(user_id, current_user.tenant_id)
+    return UserResponse.from_domain(user)
+
+
+@router.post("/{user_id}/reset-password", response_model=UserResponse)
+async def reset_password(
+    user_id: str,
+    body: UserPasswordResetRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    service: Annotated[UserService, Depends(get_user_service)],
+):
+    if not current_user.has_role("admin"):
+        raise ForbiddenException("Only admin can reset user passwords")
+
+    user = await service.reset_password_as_admin(user_id, body.password)
     return UserResponse.from_domain(user)
 
 

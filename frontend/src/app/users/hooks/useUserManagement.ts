@@ -32,5 +32,10 @@ export function useUserManagement() {
     setUsers((prev) => prev.map((user) => (user.id === userId ? activatedUser : user)));
   }, []);
 
-  return { users, isLoading, error, fetchUsers, deleteUser, activateUser };
+  const resetUserPassword = useCallback(async (userId: string, password: string) => {
+    const updatedUser = await userService.resetPassword(userId, password);
+    setUsers((prev) => prev.map((user) => (user.id === userId ? updatedUser : user)));
+  }, []);
+
+  return { users, isLoading, error, fetchUsers, deleteUser, activateUser, resetUserPassword };
 }

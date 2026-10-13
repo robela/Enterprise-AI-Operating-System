@@ -87,6 +87,14 @@ class UserService:
             raise NotFoundException(f"User {user_id!r} not found")
         await self._repo.delete_any_tenant(user.user_id)
 
+    async def reset_password_as_admin(self, user_id: str, password: str) -> User:
+        user = await self._repo.get_by_id_any_tenant(user_id)
+        if not user:
+            raise NotFoundException(f"User {user_id!r} not found")
+        user.hashed_password = hash_password(password)
+        await self._repo.save(user)
+        return user
+
     async def activate_user(self, user_id: str, tenant_id: str) -> User:
         user = await self.get_user(user_id, tenant_id)
         user.activate()
