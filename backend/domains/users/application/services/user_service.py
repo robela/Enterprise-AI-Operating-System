@@ -18,7 +18,7 @@ class UserService:
         password: str,
         roles: list[str] | None = None,
     ) -> User:
-        existing = await self._repo.get_by_email(email, tenant_id)
+        existing = await self._repo.get_by_email_any_tenant(email)
         if existing:
             raise ConflictException(f"User with email {email!r} already exists")
 
@@ -66,6 +66,26 @@ class UserService:
 
         for event in user.pop_events():
             await event_bus.publish(event)
+
+    async def deactivate_user_as_admin(self, user_id: str) -> None:
+        user = await self._repo.get_by_id_any_tenant(user_id)
+        if not user:
+            raise NotFoundException(f"User {user_id!r} not found")
+        user.deactivate()
+        await self._repo.save(user)
+
+        for event in user.pop_events():
+            await event_bus.publish(event)
+
+    async def delete_user(self, user_id: str, tenant_id: str) -> None:
+        user = await self.get_user(user_id, tenant_id)
+        await self._repo.delete(user.user_id, tenant_id)
+
+    async def delete_user_as_admin(self, user_id: str) -> None:
+        user = await self._repo.get_by_id_any_tenant(user_id)
+        if not user:
+            raise NotFoundException(f"User {user_id!r} not found")
+        await self._repo.delete_any_tenant(user.user_id)
 
     async def activate_user(self, user_id: str, tenant_id: str) -> User:
         user = await self.get_user(user_id, tenant_id)

@@ -111,4 +111,7 @@ async def deactivate_user(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[UserService, Depends(get_user_service)],
 ):
-    await service.deactivate_user(user_id, current_user.tenant_id)
+    if current_user.has_role("admin"):
+        await service.delete_user_as_admin(user_id)
+    else:
+        await service.delete_user(user_id, current_user.tenant_id)

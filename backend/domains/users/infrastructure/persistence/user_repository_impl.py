@@ -37,6 +37,13 @@ class SQLAlchemyUserRepository(UserRepository):
         model = result.scalar_one_or_none()
         return self._to_domain(model) if model else None
 
+    async def get_by_email_any_tenant(self, email: str) -> User | None:
+        result = await self._session.execute(
+            select(UserModel).where(UserModel.email == email.lower())
+        )
+        model = result.scalar_one_or_none()
+        return self._to_domain(model) if model else None
+
     async def save(self, user: User) -> None:
         result = await self._session.execute(
             select(UserModel).where(UserModel.user_id == user.user_id)
@@ -72,6 +79,15 @@ class SQLAlchemyUserRepository(UserRepository):
             select(UserModel).where(
                 UserModel.user_id == user_id, UserModel.tenant_id == tenant_id
             )
+        )
+        model = result.scalar_one_or_none()
+        if model:
+            await self._session.delete(model)
+            await self._session.flush()
+
+    async def delete_any_tenant(self, user_id: str) -> None:
+        result = await self._session.execute(
+            select(UserModel).where(UserModel.user_id == user_id)
         )
         model = result.scalar_one_or_none()
         if model:

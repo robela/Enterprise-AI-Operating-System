@@ -117,3 +117,68 @@ async def test_administrator_can_activate_existing_pending_user(db_session):
     )
 
     assert activated_user.status == UserStatus.ACTIVE
+
+
+@pytest.mark.asyncio
+async def test_email_must_be_unique_across_tenants(db_session):
+    from backend.domains.users.infrastructure.persistence.user_repository_impl import (
+        SQLAlchemyUserRepository,
+    )
+
+    service = UserService(SQLAlchemyUserRepository(db_session))
+    await service.create_user(
+        tenant_id="tenant-1",
+        email="admin@moh.gov",
+        full_name="First Admin",
+        password="strong-password",
+        roles=["tenant_admin"],
+    )
+
+    with pytest.raises(ConflictException):
+        await service.create_user(
+            tenant_id="tenant-2",
+            email="admin@moh.gov",
+            full_name="Second Admin",
+            password="strong-password",
+            roles=["tenant_admin"],
+        )
+
+
+@pytest.mark.asyncio
+async def test_administrator_can_deactivate_user_in_another_tenant(db_session):
+    from backend.domains.users.infrastructure.persistence.user_repository_impl import (
+        SQLAlchemyUserRepository,
+    )
+
+    repository = SQLAlchemyUserRepository(db_session)
+    user = await UserService(repository).create_user(
+        tenant_id="tenant-2",
+        email="other-tenant@example.com",
+        full_name="Other Tenant User",
+        password="strong-password",
+        roles=["tenant_user"],
+    )
+
+    await UserService(repository).deactivate_user_as_admin(user.user_id)
+
+    assert (await repository.get_by_id_any_tenant(user.user_id)).status == UserStatus.INACTIVE
+
+
+@pytest.mark.asyncio
+async def test_administrator_can_delete_user_in_another_tenant(db_session):
+    from backend.domains.users.infrastructure.persistence.user_repository_impl import (
+        SQLAlchemyUserRepository,
+    )
+
+    repository = SQLAlchemyUserRepository(db_session)
+    user = await UserService(repository).create_user(
+        tenant_id="tenant-2",
+        email="delete-me@example.com",
+        full_name="Delete Me",
+        password="strong-password",
+        roles=["tenant_user"],
+    )
+
+    await UserService(repository).delete_user_as_admin(user.user_id)
+
+    assert await repository.get_by_id_any_tenant(user.user_id) is None
