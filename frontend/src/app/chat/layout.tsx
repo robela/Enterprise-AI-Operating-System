@@ -7,7 +7,7 @@ export default function ChatLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ProtectedComponent authorizedRoles={["admin", "user", "callAgent"]}>
+    <ProtectedComponent authorizedRoles={["admin", "tenant_admin", "tenant_user", "user", "callAgent"]}>
       <div className="flex h-screen overflow-hidden">
         <NavSidebar />
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
