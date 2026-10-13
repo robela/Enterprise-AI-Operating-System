@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AxiosError } from "axios";
-import { Check, FileText, Image, ListChecks, Text, X } from "lucide-react";
+import { Check, FileText, Image as ImageIcon, ListChecks, Text, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -124,6 +124,15 @@ export default function DocumentsPage() {
   );
 
   const loadTenantOptions = useCallback(async () => {
+    if (role === "tenant_admin") {
+      setTenantOptions(
+        activeTenantId
+          ? [{ tenant_id: activeTenantId, name: activeTenantId, is_active: true }]
+          : [],
+      );
+      return;
+    }
+
     setTenantOptionsLoading(true);
     try {
       const { data } = await apiClient.get<TenantListItem[]>("/api/v1/tenants", {
@@ -150,7 +159,7 @@ export default function DocumentsPage() {
     } finally {
       setTenantOptionsLoading(false);
     }
-  }, [activeTenantId]);
+  }, [activeTenantId, role]);
 
   const fetchDocuments = useCallback(async () => {
     setIsLoading(true);
@@ -509,7 +518,7 @@ export default function DocumentsPage() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button type="button" role="tab" aria-label="Preview images" aria-selected={viewTab === "images"} className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${viewTab === "images" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`} onClick={() => setViewTab("images")}>
-                      <span className="inline-flex items-center gap-1.5"><Image className="h-4 w-4" />Images</span>
+                      <span className="inline-flex items-center gap-1.5"><ImageIcon className="h-4 w-4" />Images</span>
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>Preview images</TooltipContent>

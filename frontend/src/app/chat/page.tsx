@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useState, useEffect } from "react";
+import React, { Suspense, useState, useEffect, useEffectEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -50,7 +50,7 @@ function ChatInterface() {
 
   useEffect(() => { setIsClient(true); }, []);
 
-  useEffect(() => {
+  const synchronizeChatFromUrl = useEffectEvent(() => {
     if (!isClient) return;
     if (startNewConversation) {
       chat.clearChat();
@@ -65,6 +65,10 @@ function ChatInterface() {
         resetFeedbackStates();
       })();
     }
+  });
+
+  useEffect(() => {
+    synchronizeChatFromUrl();
   }, [isClient, startNewConversation, requestedChatId, chat.chatId, router, pathname, activeSector]);
 
   useEffect(() => {

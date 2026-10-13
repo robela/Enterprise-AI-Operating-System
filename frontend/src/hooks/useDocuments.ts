@@ -30,7 +30,7 @@ export function useDocuments() {
     } finally {
       setIsUploading(false);
     }
-  }, []);
+  }, [fetchDocuments]);
 
   const deleteDocument = useCallback(async (documentId: string) => {
     await documentService.delete(documentId);
