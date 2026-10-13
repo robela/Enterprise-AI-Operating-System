@@ -273,7 +273,7 @@ export default function DocumentsPage() {
   const effectiveUploadTenantId = role === "tenant_admin" ? activeTenantId : uploadTenantId;
 
   const onUpload = async () => {
-    if (!effectiveUploadTenantId) {
+    if (role !== "tenant_admin" && !effectiveUploadTenantId) {
       toast.error("Tenant selection is required");
       return;
     }
@@ -288,12 +288,12 @@ export default function DocumentsPage() {
       return;
     }
 
-    if (!activeTenantId) {
+    if (role !== "tenant_admin" && !activeTenantId) {
       toast.error("No active tenant in session");
       return;
     }
 
-    if (effectiveUploadTenantId !== activeTenantId) {
+    if (role !== "tenant_admin" && effectiveUploadTenantId !== activeTenantId) {
       toast.error("Selected tenant does not match your signed-in tenant");
       return;
     }
@@ -652,6 +652,7 @@ export default function DocumentsPage() {
             activeTenantId={activeTenantId}
             uploadTenantId={effectiveUploadTenantId}
             lockTenantSelection={role === "tenant_admin"}
+            allowInheritedTenant={role === "tenant_admin"}
             uploadFile={uploadFile}
             documentType={uploadDocumentType}
             lifecycleStatus={uploadLifecycleStatus}

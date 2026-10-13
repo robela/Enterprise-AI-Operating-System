@@ -11,6 +11,7 @@ type Props = {
   activeTenantId: string;
   uploadTenantId: string;
   lockTenantSelection: boolean;
+  allowInheritedTenant: boolean;
   uploadFile: File | null;
   documentType: DocumentTypeValue | "";
   lifecycleStatus: LifecycleStatus;
@@ -29,6 +30,7 @@ export function AddDocumentSidebarContent({
   activeTenantId,
   uploadTenantId,
   lockTenantSelection,
+  allowInheritedTenant,
   uploadFile,
   documentType,
   lifecycleStatus,
@@ -202,7 +204,7 @@ export function AddDocumentSidebarContent({
         <Button
           type="button"
           onClick={onUpload}
-          disabled={isUploading || !uploadFile || !uploadTenantId || !documentType || isTenantMismatch}
+          disabled={isUploading || !uploadFile || !documentType || (!allowInheritedTenant && !uploadTenantId) || isTenantMismatch}
         >
           {isUploading ? "Uploading..." : "Upload"}
         </Button>
