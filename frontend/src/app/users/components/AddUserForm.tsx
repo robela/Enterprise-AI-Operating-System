@@ -102,7 +102,8 @@ export function AddUserForm({ onSuccess }: AddUserFormProps) {
 
     try {
       await userService.create(data);
-      toast.success("User created successfully");
+      const assignedTenant = data.role === "admin" ? currentTenantId : data.tenant_id;
+      toast.success(assignedTenant ? `User created for tenant: ${assignedTenant}` : "User created successfully");
       reset();
       setOpen(false);
       onSuccess();

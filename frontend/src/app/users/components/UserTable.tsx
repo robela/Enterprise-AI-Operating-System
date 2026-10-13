@@ -23,6 +23,7 @@ export function UserTable({ users, isLoading, onEdit, onActivate, onDelete }: Us
           <thead className="bg-muted">
             <tr>
               <th className="text-left px-4 py-3 font-medium">Email</th>
+              <th className="text-left px-4 py-3 font-medium">Tenant</th>
               <th className="text-left px-4 py-3 font-medium">Role</th>
               <th className="text-left px-4 py-3 font-medium">Created</th>
               <th className="px-4 py-3" />
@@ -33,6 +34,9 @@ export function UserTable({ users, isLoading, onEdit, onActivate, onDelete }: Us
               <tr key={idx} className="border-t">
                 <td className="px-4 py-3">
                   <div className="h-4 bg-muted animate-pulse rounded w-48" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="h-4 bg-muted animate-pulse rounded w-20" />
                 </td>
                 <td className="px-4 py-3">
                   <div className="h-4 bg-muted animate-pulse rounded w-16" />
@@ -63,6 +67,7 @@ export function UserTable({ users, isLoading, onEdit, onActivate, onDelete }: Us
         <thead className="bg-muted">
           <tr>
             <th className="text-left px-4 py-3 font-medium">Email</th>
+            <th className="text-left px-4 py-3 font-medium">Tenant</th>
             <th className="text-left px-4 py-3 font-medium">Role</th>
             <th className="text-left px-4 py-3 font-medium">Created</th>
             <th className="px-4 py-3" />
@@ -72,6 +77,7 @@ export function UserTable({ users, isLoading, onEdit, onActivate, onDelete }: Us
           {users.map((user) => (
             <tr key={user.id} className="border-t hover:bg-muted/50">
               <td className="px-4 py-3">{user.email}</td>
+              <td className="px-4 py-3 text-muted-foreground">{user.tenant_id ?? "Default"}</td>
               <td className="px-4 py-3">{formatRole(user.role)}</td>
               <td className="px-4 py-3 text-muted-foreground">{new Date(user.created_at).toLocaleDateString()}</td>
               <td className="px-4 py-3 flex gap-2 justify-end">
