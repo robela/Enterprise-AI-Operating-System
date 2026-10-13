@@ -8,6 +8,8 @@ import {
   type DocumentUploadResult,
 } from "@/types/document";
 
+const DOCUMENT_TRANSFER_TIMEOUT_MS = 120000;
+
 export type DocumentChunkPreview = {
   index: number;
   text: string;
@@ -46,6 +48,7 @@ export const documentService = {
     }
     const { data } = await apiClient.post("/api/v1/documents", form, {
       headers: { "Content-Type": "multipart/form-data" },
+      timeout: DOCUMENT_TRANSFER_TIMEOUT_MS,
     });
     return documentUploadSchema.parse(data);
   },
@@ -65,6 +68,7 @@ export const documentService = {
     }
     const { data } = await apiClient.put(`/api/v1/documents/${documentId}`, form, {
       headers: { "Content-Type": "multipart/form-data" },
+      timeout: DOCUMENT_TRANSFER_TIMEOUT_MS,
     });
     return documentUploadSchema.parse(data);
   },
