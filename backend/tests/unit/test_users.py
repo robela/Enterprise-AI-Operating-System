@@ -3,6 +3,7 @@ import pytest
 
 from backend.domains.users.application.services.user_service import UserService
 from backend.domains.users.domain.entities.user import User, UserStatus
+from backend.domains.identity.application.services.auth_service import AuthService
 from backend.domains.users.domain.value_objects.email import Email
 from backend.domains.users.domain.events.user_events import UserCreated, UserDeactivated
 
@@ -68,3 +69,27 @@ async def test_administrator_created_user_is_active(db_session):
     )
 
     assert user.status == UserStatus.ACTIVE
+
+
+@pytest.mark.asyncio
+async def test_administrator_created_user_can_log_in_immediately(db_session):
+    from backend.domains.users.infrastructure.persistence.user_repository_impl import (
+        SQLAlchemyUserRepository,
+    )
+
+    repository = SQLAlchemyUserRepository(db_session)
+    await UserService(repository).create_user(
+        tenant_id="tenant-1",
+        email="new-user@example.com",
+        full_name="New User",
+        password="strong-password",
+        roles=["tenant_user"],
+    )
+
+    tokens = await AuthService(repository).login(
+        email="new-user@example.com",
+        password="strong-password",
+        tenant_id="tenant-1",
+    )
+
+    assert tokens["access_token"]
