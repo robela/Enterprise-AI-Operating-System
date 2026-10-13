@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime
+import asyncio
 import json
 
 from google.cloud import storage
@@ -11,6 +12,8 @@ import structlog
 from backend.core.config.settings import settings
 
 logger = structlog.get_logger(__name__)
+
+GCS_OPERATION_TIMEOUT_SECONDS = 30
 
 
 class GCSStorage:
@@ -32,7 +35,10 @@ class GCSStorage:
         self, key: str, data: bytes, content_type: str = "application/octet-stream"
     ) -> str:
         blob = self._bucket.blob(key)
-        blob.upload_from_string(data, content_type=content_type)
+        await asyncio.wait_for(
+            asyncio.to_thread(blob.upload_from_string, data, content_type=content_type),
+            timeout=GCS_OPERATION_TIMEOUT_SECONDS,
+        )
         logger.info("gcs_upload", bucket=self._bucket_name, key=key)
         return f"gs://{self._bucket_name}/{key}"
 
@@ -42,14 +48,20 @@ class GCSStorage:
         if key.startswith(prefix):
             key = key[len(prefix):]
         blob = self._bucket.blob(key)
-        return blob.download_as_bytes()
+        return await asyncio.wait_for(
+            asyncio.to_thread(blob.download_as_bytes),
+            timeout=GCS_OPERATION_TIMEOUT_SECONDS,
+        )
 
     async def delete(self, key: str) -> None:
         prefix = f"gs://{self._bucket_name}/"
         if key.startswith(prefix):
             key = key[len(prefix):]
         blob = self._bucket.blob(key)
-        blob.delete()
+        await asyncio.wait_for(
+            asyncio.to_thread(blob.delete),
+            timeout=GCS_OPERATION_TIMEOUT_SECONDS,
+        )
 
     async def get_presigned_url(self, key: str, expiry_seconds: int = 3600) -> str:
         """Generate a V4 signed URL (requires a service-account credential)."""
