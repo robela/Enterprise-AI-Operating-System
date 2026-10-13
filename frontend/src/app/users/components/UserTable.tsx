@@ -11,10 +11,11 @@ interface UserTableProps {
   users: User[];
   isLoading: boolean;
   onEdit: (user: User) => void;
+  onActivate: (userId: string) => void;
   onDelete: (userId: string) => void;
 }
 
-export function UserTable({ users, isLoading, onEdit, onDelete }: UserTableProps) {
+export function UserTable({ users, isLoading, onEdit, onActivate, onDelete }: UserTableProps) {
   if (isLoading) {
     return (
       <div className="border rounded-lg overflow-hidden">
@@ -74,6 +75,15 @@ export function UserTable({ users, isLoading, onEdit, onDelete }: UserTableProps
               <td className="px-4 py-3">{formatRole(user.role)}</td>
               <td className="px-4 py-3 text-muted-foreground">{new Date(user.created_at).toLocaleDateString()}</td>
               <td className="px-4 py-3 flex gap-2 justify-end">
+                {!user.is_active && (
+                  <button
+                    type="button"
+                    onClick={() => onActivate(user.id)}
+                    className="text-xs px-3 py-1 rounded border border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
+                  >
+                    Activate
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => onEdit(user)}

@@ -67,5 +67,15 @@ class UserService:
         for event in user.pop_events():
             await event_bus.publish(event)
 
+    async def activate_user(self, user_id: str, tenant_id: str) -> User:
+        user = await self.get_user(user_id, tenant_id)
+        user.activate()
+        await self._repo.save(user)
+
+        for event in user.pop_events():
+            await event_bus.publish(event)
+
+        return user
+
     async def list_users(self, tenant_id: str, skip: int = 0, limit: int = 50) -> list[User]:
         return await self._repo.list_by_tenant(tenant_id, skip=skip, limit=limit)

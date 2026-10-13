@@ -69,6 +69,11 @@ export const userService = {
     return normalizeUser(data as BackendUser);
   },
 
+  async activate(id: string): Promise<User> {
+    const { data } = await apiClient.post(`/api/v1/users/${id}/activate`);
+    return normalizeUser(data as BackendUser);
+  },
+
   async delete(id: string): Promise<void> {
     await apiClient.delete(`/api/v1/users/${id}`);
   },

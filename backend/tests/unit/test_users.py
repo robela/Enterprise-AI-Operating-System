@@ -93,3 +93,27 @@ async def test_administrator_created_user_can_log_in_immediately(db_session):
     )
 
     assert tokens["access_token"]
+
+
+@pytest.mark.asyncio
+async def test_administrator_can_activate_existing_pending_user(db_session):
+    from backend.domains.users.infrastructure.persistence.user_repository_impl import (
+        SQLAlchemyUserRepository,
+    )
+
+    repository = SQLAlchemyUserRepository(db_session)
+    pending_user = User.create(
+        tenant_id="tenant-1",
+        email="pending-user@example.com",
+        full_name="Pending User",
+        hashed_password="hashed",
+        roles=["tenant_user"],
+    )
+    await repository.save(pending_user)
+
+    activated_user = await UserService(repository).activate_user(
+        pending_user.user_id,
+        "tenant-1",
+    )
+
+    assert activated_user.status == UserStatus.ACTIVE

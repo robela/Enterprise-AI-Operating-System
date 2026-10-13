@@ -27,5 +27,10 @@ export function useUserManagement() {
     setUsers((prev) => prev.filter((user) => user.id !== userId));
   }, []);
 
-  return { users, isLoading, error, fetchUsers, deleteUser };
+  const activateUser = useCallback(async (userId: string) => {
+    const activatedUser = await userService.activate(userId);
+    setUsers((prev) => prev.map((user) => (user.id === userId ? activatedUser : user)));
+  }, []);
+
+  return { users, isLoading, error, fetchUsers, deleteUser, activateUser };
 }

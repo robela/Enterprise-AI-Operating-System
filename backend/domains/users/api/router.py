@@ -86,6 +86,19 @@ async def update_user(
     return UserResponse.from_domain(user)
 
 
+@router.post("/{user_id}/activate", response_model=UserResponse)
+async def activate_user(
+    user_id: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    service: Annotated[UserService, Depends(get_user_service)],
+):
+    if not current_user.has_role("admin", "tenant_admin"):
+        raise ForbiddenException("Only administrators can activate users")
+
+    user = await service.activate_user(user_id, current_user.tenant_id)
+    return UserResponse.from_domain(user)
+
+
 @router.delete("/{user_id}", status_code=204)
 async def deactivate_user(
     user_id: str,

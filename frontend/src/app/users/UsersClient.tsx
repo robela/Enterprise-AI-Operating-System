@@ -10,7 +10,7 @@ import { UserTable } from "./components/UserTable";
 import { useUserManagement } from "./hooks/useUserManagement";
 
 export function UsersClient() {
-  const { users, isLoading, error, fetchUsers, deleteUser } = useUserManagement();
+  const { users, isLoading, error, fetchUsers, deleteUser, activateUser } = useUserManagement();
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
   useEffect(() => {
@@ -26,6 +26,15 @@ export function UsersClient() {
     }
   };
 
+  const handleActivate = async (userId: string) => {
+    try {
+      await activateUser(userId);
+      toast.success("User activated");
+    } catch {
+      toast.error("Failed to activate user");
+    }
+  };
+
   if (error) {
     return <div className="text-destructive text-sm">Failed to load users: {error.message}</div>;
   }
@@ -37,7 +46,13 @@ export function UsersClient() {
         <AddUserForm onSuccess={fetchUsers} />
       </div>
 
-      <UserTable users={users} isLoading={isLoading} onEdit={setEditingUser} onDelete={handleDelete} />
+      <UserTable
+        users={users}
+        isLoading={isLoading}
+        onEdit={setEditingUser}
+        onActivate={handleActivate}
+        onDelete={handleDelete}
+      />
 
       {editingUser && <p className="text-sm text-muted-foreground">Editing: {editingUser.email}</p>}
     </div>
