@@ -34,6 +34,8 @@ type Props = {
   onOpenAddDocument: () => void;
   onView: (documentId: string) => void;
   onEdit: (documentId: string) => void;
+  onReingest: (documentId: string) => void;
+  reingestingDocumentId: string | null;
 };
 
 export function DocumentTable({
@@ -47,6 +49,8 @@ export function DocumentTable({
   onOpenAddDocument,
   onView,
   onEdit,
+  onReingest,
+  reingestingDocumentId,
 }: Props) {
   return (
     <TooltipProvider>
@@ -139,6 +143,23 @@ export function DocumentTable({
                       </TooltipTrigger>
                       <TooltipContent>View document</TooltipContent>
                     </Tooltip>
+                    {doc.status === "failed" && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            aria-label="Retry ingestion"
+                            onClick={() => onReingest(doc.document_id)}
+                            disabled={reingestingDocumentId === doc.document_id}
+                          >
+                            <RefreshCw className={`h-4 w-4 ${reingestingDocumentId === doc.document_id ? "animate-spin" : ""}`} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Retry ingestion</TooltipContent>
+                      </Tooltip>
+                    )}
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button

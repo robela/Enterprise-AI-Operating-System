@@ -356,6 +356,59 @@ async def list_documents(
     }
 
 
+@router.post("/{document_id}/reingest")
+async def reingest_document(
+    document_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+    service: DocumentService = Depends(get_document_service),
+    db: Annotated[AsyncSession, Depends(get_db)] = None,
+):
+    """Retry indexing a stored document within the authenticated tenant."""
+    _require_tenant_admin(current_user)
+    doc = await service.get(document_id, current_user.tenant_id)
+    content = await get_storage().download(doc.storage_path)
+
+    doc = await service.mark_processing(document_id, current_user.tenant_id)
+    await db.commit()
+
+    try:
+        pipeline = RAGPipeline(tenant_id=current_user.tenant_id)
+        chunk_count = await pipeline.ingest(
+            document_id=doc.document_id,
+            text=extract_text(content, doc.filename, doc.content_type),
+            metadata={
+                "tenant_id": current_user.tenant_id,
+                "filename": doc.filename,
+                "content_type": doc.content_type,
+                "document_type": doc.doc_type.value,
+                "lifecycle_status": doc.lifecycle_status.value,
+            },
+        )
+        doc = await service.mark_indexed(doc.document_id, current_user.tenant_id, chunk_count)
+        await db.commit()
+        await _create_workflow_drafts(
+            db, current_user.tenant_id, doc.document_id, content, doc.filename
+        )
+        await db.commit()
+    except Exception as exc:
+        logger.warning(
+            "document_reingestion_failed",
+            document_id=doc.document_id,
+            tenant_id=current_user.tenant_id,
+            error=str(exc),
+        )
+        doc = await service.mark_failed(doc.document_id, current_user.tenant_id)
+        await db.commit()
+
+    return {
+        "document_id": doc.document_id,
+        "status": doc.status.value,
+        "chunk_count": doc.chunk_count,
+        "doc_type": doc.doc_type.value,
+        "lifecycle_status": doc.lifecycle_status.value,
+    }
+
+
 @router.post("/{document_id}/extract-workflows")
 async def extract_document_workflows(
     document_id: str,

@@ -140,6 +140,35 @@ async def test_upload_document_returns_service_unavailable_when_storage_fails(
 
 
 @pytest.mark.asyncio
+async def test_reingest_document_retries_failed_document(client, db_session, document_dependency_stubs) -> None:
+    token = _token(user_id="doc-user-retry", tenant_id="tenant-doc-retry")
+    create_response = await client.post(
+        "/api/v1/documents",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("retry.txt", b"retry document", "text/plain")},
+    )
+    assert create_response.status_code == 201
+    document_id = create_response.json()["document_id"]
+
+    document = await db_session.scalar(
+        select(DocumentModel).where(DocumentModel.document_id == document_id)
+    )
+    assert document is not None
+    document.status = "failed"
+    await db_session.commit()
+
+    response = await client.post(
+        f"/api/v1/documents/{document_id}/reingest",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "indexed"
+    assert response.json()["chunk_count"] == 3
+    assert len(document_dependency_stubs["pipelines"]) == 2
+
+
+@pytest.mark.asyncio
 async def test_replace_document_reindexes_and_cleans_old_storage(client, db_session, document_dependency_stubs) -> None:
     token = _token(user_id="doc-user-2", tenant_id="tenant-doc-b")
 

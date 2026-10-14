@@ -73,6 +73,13 @@ export const documentService = {
     return documentUploadSchema.parse(data);
   },
 
+  async reingest(documentId: string): Promise<DocumentUploadResult> {
+    const { data } = await apiClient.post(`/api/v1/documents/${documentId}/reingest`, undefined, {
+      timeout: DOCUMENT_TRANSFER_TIMEOUT_MS,
+    });
+    return documentUploadSchema.parse(data);
+  },
+
   async getContent(documentId: string): Promise<Blob> {
     const { data } = await apiClient.get(`/api/v1/documents/${documentId}/content`, {
       responseType: "blob",

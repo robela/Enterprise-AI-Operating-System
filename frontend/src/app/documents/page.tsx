@@ -81,6 +81,7 @@ export default function DocumentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [reingestingDocumentId, setReingestingDocumentId] = useState<string | null>(null);
 
   const tenantLabel = useMemo(() => tenant_id || "unknown", [tenant_id]);
   const activeTenantId = tenant_id ?? "";
@@ -375,6 +376,23 @@ export default function DocumentsPage() {
     }
   };
 
+  const onReingestDocument = async (documentId: string) => {
+    setReingestingDocumentId(documentId);
+    try {
+      const updated = await documentService.reingest(documentId);
+      setDocuments((currentDocuments) => currentDocuments.map((document) => (
+        document.document_id === documentId
+          ? { ...document, status: updated.status }
+          : document
+      )));
+      toast.success(updated.status === "indexed" ? "Document indexed" : "Document ingestion failed");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Unable to retry document ingestion"));
+    } finally {
+      setReingestingDocumentId(null);
+    }
+  };
+
   const onExtractWorkflows = async () => {
     if (!viewedDocument) return;
     setIsExtractingWorkflows(true);
@@ -473,6 +491,8 @@ export default function DocumentsPage() {
           setSelectedDocumentId(documentId);
           setShowEditDocSidebar(true);
         }}
+        onReingest={(documentId) => void onReingestDocument(documentId)}
+        reingestingDocumentId={reingestingDocumentId}
       />
 
       <Sheet open={showViewDocSidebar} onOpenChange={handleViewSidebarChange}>
