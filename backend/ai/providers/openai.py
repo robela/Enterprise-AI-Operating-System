@@ -7,6 +7,11 @@ from backend.ai.base import BaseAIProvider, ChatMessage, ChatResponse
 from backend.core.config.settings import settings
 
 
+def _has_usable_api_key() -> bool:
+    api_key = settings.openai_api_key.strip()
+    return bool(api_key) and not api_key.startswith("sk-YOUR_")
+
+
 class OpenAIProvider(BaseAIProvider):
     provider_name = "openai"
 
@@ -22,15 +27,15 @@ class OpenAIProvider(BaseAIProvider):
         max_tokens: int = 2048,
         **kwargs,
     ) -> ChatResponse:
-        if not settings.openai_api_key:
+        if not _has_usable_api_key():
             # Fallback to mock provider if no API key
             from backend.ai.providers.mock import MockProvider
             mock = MockProvider()
             return await mock.chat(messages, temperature, max_tokens, **kwargs)
-        
+
         if self._client is None:
             self._client = AsyncOpenAI(api_key=settings.openai_api_key)
-        
+
         response = await self._client.chat.completions.create(
             model=self._model,
             messages=[{"role": m.role, "content": m.content} for m in messages],
@@ -69,7 +74,7 @@ class OpenAIProvider(BaseAIProvider):
                 yield delta
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
-        if not settings.openai_api_key:
+        if not _has_usable_api_key():
             from backend.ai.providers.mock import MockProvider
 
             return await MockProvider().embed(texts)

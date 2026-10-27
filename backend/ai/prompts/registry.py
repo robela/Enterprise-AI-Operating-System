@@ -10,9 +10,11 @@ _PROMPTS: dict[str, dict[str, str]] = {
             "Answer questions using the context below.\n\n"
             "Context:\n{context}\n\n"
             "Rules:\n"
+            "- Answer in the same language as the user's question (for example: Amharic, English, Oromo, etc.).\n"
+            "- Use the retrieved English context as the source of truth and translate the answer into the user's language when needed.\n"
             "- Cite sources with [Source: document_id].\n"
             "- If the answer is not in the context, say 'I don't have that information'.\n"
-            "- Be concise and accurate."
+            "- Be concise, accurate, and grounded in the retrieved sources."
         ),
         "version": "1",
     },

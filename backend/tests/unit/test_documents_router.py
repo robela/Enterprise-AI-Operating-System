@@ -169,6 +169,55 @@ async def test_reingest_document_retries_failed_document(client, db_session, doc
 
 
 @pytest.mark.asyncio
+async def test_reingest_keeps_indexed_status_when_workflow_draft_persistence_fails(
+    client, db_session, document_dependency_stubs, monkeypatch
+) -> None:
+    from backend.api.rest import documents_router
+
+    async def fail_replace_drafts(*_args, **_kwargs) -> None:
+        raise RuntimeError("Workflow draft persistence failed")
+
+    monkeypatch.setattr(documents_router, "extract_pdf_pages", lambda _content: ["Step 1\nStep 2"])
+    monkeypatch.setattr(documents_router, "extract_workflow_drafts", lambda _pages: [])
+    monkeypatch.setattr(
+        documents_router.ExtractedWorkflowService,
+        "replace_drafts",
+        fail_replace_drafts,
+    )
+    token = _token(user_id="doc-user-workflow-retry", tenant_id="tenant-doc-workflow-retry")
+
+    create_response = await client.post(
+        "/api/v1/documents",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("workflow.pdf", b"placeholder PDF content", "application/pdf")},
+    )
+    document_id = create_response.json()["document_id"]
+
+    document = await db_session.scalar(
+        select(DocumentModel).where(DocumentModel.document_id == document_id)
+    )
+    assert document is not None
+    document.status = "failed"
+    await db_session.commit()
+
+    response = await client.post(
+        f"/api/v1/documents/{document_id}/reingest",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "indexed"
+    assert response.json()["chunk_count"] == 3
+
+    persisted = await db_session.scalar(
+        select(DocumentModel).where(DocumentModel.document_id == document_id)
+    )
+    assert persisted is not None
+    assert persisted.status == "indexed"
+    assert persisted.chunk_count == 3
+
+
+@pytest.mark.asyncio
 async def test_replace_document_reindexes_and_cleans_old_storage(client, db_session, document_dependency_stubs) -> None:
     token = _token(user_id="doc-user-2", tenant_id="tenant-doc-b")
 

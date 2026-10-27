@@ -1,0 +1,32 @@
+[1mdiff --git a/frontend/src/app/chat/page.tsx b/frontend/src/app/chat/page.tsx[m
+[1mindex d5c341f..9625c01 100644[m
+[1m--- a/frontend/src/app/chat/page.tsx[m
+[1m+++ b/frontend/src/app/chat/page.tsx[m
+[36m@@ -1,6 +1,6 @@[m
+ "use client";[m
+ [m
+[31m-import React, { Suspense, useState, useEffect, useEffectEvent } from "react";[m
+[32m+[m[32mimport React, { Suspense, useState, useEffect } from "react";[m
+ import { usePathname, useRouter, useSearchParams } from "next/navigation";[m
+ import { ScrollArea } from "@/components/ui/scroll-area";[m
+ import { Button } from "@/components/ui/button";[m
+[36m@@ -50,7 +50,7 @@[m [mfunction ChatInterface() {[m
+ [m
+   useEffect(() => { setIsClient(true); }, []);[m
+ [m
+[31m-  const synchronizeChatFromUrl = useEffectEvent(() => {[m
+[32m+[m[32m  useEffect(() => {[m
+     if (!isClient) return;[m
+     if (startNewConversation) {[m
+       chat.clearChat();[m
+[36m@@ -65,10 +65,6 @@[m [mfunction ChatInterface() {[m
+         resetFeedbackStates();[m
+       })();[m
+     }[m
+[31m-  });[m
+[31m-[m
+[31m-  useEffect(() => {[m
+[31m-    synchronizeChatFromUrl();[m
+   }, [isClient, startNewConversation, requestedChatId, chat.chatId, router, pathname, activeSector]);[m
+ [m
+   useEffect(() => {[m

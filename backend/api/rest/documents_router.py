@@ -70,7 +70,9 @@ async def _create_workflow_drafts(
     try:
         drafts = extract_workflow_drafts(extract_pdf_pages(content))
         await ExtractedWorkflowService(db).replace_drafts(tenant_id, document_id, drafts)
+        await db.commit()
     except Exception as exc:
+        await db.rollback()
         logger.warning(
             "document_workflow_extraction_failed",
             tenant_id=tenant_id,
@@ -175,10 +177,6 @@ async def upload_document(
         )
         doc = await service.mark_indexed(doc.document_id, current_user.tenant_id, chunk_count)
         await db.commit()
-        await _create_workflow_drafts(
-            db, current_user.tenant_id, doc.document_id, content, doc.filename
-        )
-        await db.commit()
     except Exception as exc:
         logger.warning(
             "document_indexing_failed",
@@ -199,6 +197,10 @@ async def upload_document(
             )
             # Keep response consistent even if failed-status persistence races on local SQLite.
             doc.mark_failed()
+    else:
+        await _create_workflow_drafts(
+            db, current_user.tenant_id, doc.document_id, content, doc.filename
+        )
 
     return {
         "document_id": doc.document_id,
@@ -264,10 +266,6 @@ async def replace_document(
         )
         doc = await service.mark_indexed(doc.document_id, current_user.tenant_id, chunk_count)
         await db.commit()
-        await _create_workflow_drafts(
-            db, current_user.tenant_id, doc.document_id, content, doc.filename
-        )
-        await db.commit()
     except Exception as exc:
         logger.warning(
             "document_reindexing_failed",
@@ -287,6 +285,10 @@ async def replace_document(
                 error=str(mark_failed_exc),
             )
             doc.mark_failed()
+    else:
+        await _create_workflow_drafts(
+            db, current_user.tenant_id, doc.document_id, content, doc.filename
+        )
 
     if old_storage_path and old_storage_path != new_storage_path:
         try:
@@ -386,10 +388,6 @@ async def reingest_document(
         )
         doc = await service.mark_indexed(doc.document_id, current_user.tenant_id, chunk_count)
         await db.commit()
-        await _create_workflow_drafts(
-            db, current_user.tenant_id, doc.document_id, content, doc.filename
-        )
-        await db.commit()
     except Exception as exc:
         logger.warning(
             "document_reingestion_failed",
@@ -399,6 +397,10 @@ async def reingest_document(
         )
         doc = await service.mark_failed(doc.document_id, current_user.tenant_id)
         await db.commit()
+    else:
+        await _create_workflow_drafts(
+            db, current_user.tenant_id, doc.document_id, content, doc.filename
+        )
 
     return {
         "document_id": doc.document_id,

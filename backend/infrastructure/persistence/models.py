@@ -4,8 +4,10 @@ from typing import Optional
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from pgvector.sqlalchemy import Vector
 
 from backend.core.database.session import Base
+from backend.core.config.settings import settings
 
 
 class UserModel(Base):
@@ -99,6 +101,22 @@ class DocumentModel(Base):
     tags: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class DocumentChunkModel(Base):
+    """A tenant-scoped document chunk and its embedding for retrieval."""
+
+    __tablename__ = "document_chunks"
+
+    tenant_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    document_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    chunk_index: Mapped[int] = mapped_column(Integer, primary_key=True)
+    chunk_text: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[list[float]] = mapped_column(
+        Vector(settings.embedding_dimension).with_variant(Text(), "sqlite"),
+        nullable=False,
+    )
+    metadata_: Mapped[str | None] = mapped_column("metadata", Text, nullable=True)
 
 
 class ExtractedWorkflowModel(Base):

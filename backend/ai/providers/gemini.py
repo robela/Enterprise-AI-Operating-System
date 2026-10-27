@@ -12,7 +12,7 @@ class GeminiProvider(BaseAIProvider):
 
     def __init__(self):
         genai.configure(api_key=settings.gemini_api_key)
-        self._model_name = "gemini-1.5-pro"
+        self._model_name = settings.gemini_model
 
     async def chat(
         self, messages: list[ChatMessage], temperature: float = 0.7, max_tokens: int = 2048, **kwargs
@@ -52,7 +52,9 @@ class GeminiProvider(BaseAIProvider):
         results = []
         for text in texts:
             result = await genai.embed_content_async(
-                model="models/text-embedding-004", content=text
+                model="models/gemini-embedding-001",
+                content=text,
+                output_dimensionality=settings.embedding_dimension,
             )
             results.append(result["embedding"])
         return results

@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     azure_openai_deployment: str = Field("", alias="AZURE_OPENAI_DEPLOYMENT")
 
     gemini_api_key: str = Field("", alias="GEMINI_API_KEY")
+    gemini_model: str = Field("gemini-2.0-flash", alias="GEMINI_MODEL")
     anthropic_api_key: str = Field("", alias="ANTHROPIC_API_KEY")
 
     ollama_base_url: str = Field("http://localhost:11434", alias="OLLAMA_BASE_URL")

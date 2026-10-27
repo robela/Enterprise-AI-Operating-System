@@ -2,7 +2,7 @@
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 
-from sqlalchemy import event, select
+from sqlalchemy import event, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -118,7 +118,12 @@ DEFAULT_WORKFLOW_TEMPLATES: list[dict[str, object]] = [
 
 async def init_db() -> None:
     """Create all tables (dev/test only — production uses Alembic)."""
+    # Register every SQLAlchemy mapping before deriving the metadata schema.
+    import backend.infrastructure.persistence.models
+
     async with engine.begin() as conn:
+        if not _is_sqlite:
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
 
     # Seed default sectors and workflow templates in dev/test environments.
