@@ -15,6 +15,7 @@ from backend.ai.agents.base_agent import AgentContext
 from backend.ai.multilingual import analyze_query
 from backend.ai.providers import get_provider
 from backend.ai.rag.pipeline import RAGPipeline
+from backend.ai.rag.reranker import Reranker, build_reranker
 from backend.ai.safety.policy import SafetyPolicy
 from backend.infrastructure.persistence.models import (
     ConversationModel,
@@ -316,13 +317,28 @@ async def chat(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+async def get_tenant_reranker(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Reranker:
+    """The reranker an admin chose for the caller's tenant (or the RAG_RERANKER default)."""
+    tenant_settings = await db.scalar(
+        select(OrganizationModel.settings).where(
+            OrganizationModel.slug == current_user.tenant_id,
+            OrganizationModel.is_active.is_(True),
+        )
+    )
+    return build_reranker(tenant_settings if isinstance(tenant_settings, dict) else None)
+
+
 @router.post("/rag/query", response_model=ChatResponse)
 async def rag_query(
     body: RAGQueryRequest,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    reranker: Annotated[Reranker, Depends(get_tenant_reranker)],
 ):
     analysis = await analyze_query(body.question, get_provider(), requested_language=body.language)
-    pipeline = RAGPipeline(tenant_id=current_user.tenant_id)
+    pipeline = RAGPipeline(tenant_id=current_user.tenant_id, reranker=reranker)
     result = await pipeline.query(
         body.question,
         top_k=body.top_k,

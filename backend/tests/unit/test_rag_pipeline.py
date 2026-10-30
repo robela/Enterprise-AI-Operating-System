@@ -113,6 +113,36 @@ async def test_language_directive_follows_tenant_prompt_override(rag) -> None:
 
 
 @pytest.mark.asyncio
+async def test_uses_the_injected_reranker(rag) -> None:
+    pipeline, _, _ = rag([AMHARIC_ANSWER])
+
+    class RecordingReranker:
+        def __init__(self):
+            self.calls = []
+
+        async def rerank(self, query, chunks, top_k=5):
+            self.calls.append((query, [c.document_id for c in chunks], top_k))
+            return [c for c in chunks if c.document_id == "doc-vax"]
+
+    reranker = RecordingReranker()
+    pipeline._reranker = reranker
+
+    result = await pipeline.query(
+        AMHARIC_QUESTION, top_k=2, language="am", english_query=ENGLISH_TRANSLATION
+    )
+
+    assert reranker.calls[0][0] == [AMHARIC_QUESTION, ENGLISH_TRANSLATION]
+    assert reranker.calls[0][2] == 2
+    assert result["sources"] == ["doc-vax"]
+
+
+def test_reranker_is_injected_through_the_constructor() -> None:
+    sentinel = object()
+
+    assert RAGPipeline(tenant_id="tenant-ml", reranker=sentinel)._reranker is sentinel
+
+
+@pytest.mark.asyncio
 async def test_ingest_embeds_chunks_as_documents(monkeypatch) -> None:
     embedder = FakeProvider()
     stored = {}

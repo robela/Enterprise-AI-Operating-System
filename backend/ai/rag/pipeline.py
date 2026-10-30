@@ -7,7 +7,7 @@ import structlog
 
 from backend.ai.rag.chunker import Chunk, TextChunker
 from backend.ai.rag.retriever import VectorRetriever
-from backend.ai.rag.reranker import CrossEncoderReranker
+from backend.ai.rag.reranker import Reranker, VectorReranker
 from backend.ai.providers import get_embedding_provider, get_provider
 from backend.ai.base import ChatMessage
 from backend.ai.language import answer_matches_language, language_directive, rewrite_instruction
@@ -24,11 +24,12 @@ class RAGPipeline:
             user's language + Citations
     """
 
-    def __init__(self, tenant_id: str):
+    def __init__(self, tenant_id: str, reranker: Reranker | None = None):
+        """reranker: use build_reranker(tenant_settings) to honor the tenant's choice."""
         self.tenant_id = tenant_id
         self._chunker = TextChunker()
         self._retriever = VectorRetriever(tenant_id=tenant_id)
-        self._reranker = CrossEncoderReranker()
+        self._reranker = reranker or VectorReranker()
 
     async def ingest(self, document_id: str, text: str, metadata: dict | None = None) -> int:
         """Chunk, embed, and store a document. Returns chunk count."""
@@ -72,7 +73,7 @@ class RAGPipeline:
 
         try:
             candidates = await self._retrieve(query_embeddings, top_k * 2)
-            chunks = self._reranker.rerank(search_queries, candidates, top_k=top_k)
+            chunks = await self._reranker.rerank(search_queries, candidates, top_k=top_k)
         except Exception as exc:
             logger.warning("rag_retrieval_failed", tenant_id=self.tenant_id, error=str(exc))
             chunks = []

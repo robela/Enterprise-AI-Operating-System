@@ -1,7 +1,7 @@
 """Tenant onboarding and registry endpoints (admin-only)."""
 from datetime import datetime, timezone
 import re
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Query
@@ -10,6 +10,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
+from backend.ai.rag.reranker import resolve_reranker_name
 from backend.core.database.session import get_db
 from backend.core.exceptions.base import (
     ConflictException,
@@ -83,6 +84,17 @@ class TenantPromptsUpdateRequest(BaseModel):
 class TenantPromptsResponse(BaseModel):
     tenant_id: str
     prompts: dict
+
+
+class TenantRagSettingsUpdateRequest(BaseModel):
+    # vector = similarity ranking only; llm = the chat model reranks (multilingual)
+    reranker: Literal["vector", "llm"]
+
+
+class TenantRagSettingsResponse(BaseModel):
+    tenant_id: str
+    reranker: str  # effective choice
+    reranker_source: Literal["tenant", "default"]
 
 
 class TenantUpdateRequest(BaseModel):
@@ -391,3 +403,45 @@ async def update_tenant_prompts(
 
     await db.flush()
     return TenantPromptsResponse(tenant_id=tenant.slug, prompts=tenant.settings.get("prompts", {}))
+
+
+def _to_rag_settings_response(tenant: OrganizationModel) -> TenantRagSettingsResponse:
+    settings = tenant.settings if isinstance(tenant.settings, dict) else {}
+    rag = settings.get("rag") if isinstance(settings.get("rag"), dict) else {}
+    return TenantRagSettingsResponse(
+        tenant_id=tenant.slug,
+        reranker=resolve_reranker_name(settings),
+        reranker_source="tenant" if rag.get("reranker") else "default",
+    )
+
+
+@router.get("/{tenant_id}/rag", response_model=TenantRagSettingsResponse)
+async def get_tenant_rag_settings(
+    tenant_id: str,
+    current_user: CurrentUser = Depends(require_roles("admin")),
+    db: Annotated[AsyncSession, Depends(get_db)] = None,
+):
+    tenant = await _get_tenant_or_404(db, tenant_id)
+    return _to_rag_settings_response(tenant)
+
+
+@router.patch("/{tenant_id}/rag", response_model=TenantRagSettingsResponse)
+async def update_tenant_rag_settings(
+    tenant_id: str,
+    body: TenantRagSettingsUpdateRequest,
+    current_user: CurrentUser = Depends(require_roles("admin")),
+    db: Annotated[AsyncSession, Depends(get_db)] = None,
+):
+    """Turn the multilingual LLM reranker on ("llm") or off ("vector") for a tenant."""
+    tenant = await _get_tenant_or_404(db, tenant_id)
+    # Reassign fresh dicts so SQLAlchemy tracks JSON changes reliably.
+    settings = dict(tenant.settings) if isinstance(tenant.settings, dict) else {}
+    rag = dict(settings.get("rag")) if isinstance(settings.get("rag"), dict) else {}
+
+    rag["reranker"] = body.reranker
+    settings["rag"] = rag
+    tenant.settings = settings
+    flag_modified(tenant, "settings")
+
+    await db.flush()
+    return _to_rag_settings_response(tenant)

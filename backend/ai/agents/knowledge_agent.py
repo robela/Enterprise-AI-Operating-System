@@ -2,6 +2,7 @@
 from backend.ai.agents.base_agent import BaseAgent, AgentContext, AgentResult
 from backend.ai.prompts.registry import prompt_registry
 from backend.ai.rag.pipeline import RAGPipeline
+from backend.ai.rag.reranker import build_reranker
 
 
 class KnowledgeAgent(BaseAgent):
@@ -15,7 +16,8 @@ class KnowledgeAgent(BaseAgent):
             tenant_settings=tenant_settings,
         )
 
-        rag = RAGPipeline(tenant_id=context.tenant_id)
+        reranker = build_reranker(tenant_settings)
+        rag = RAGPipeline(tenant_id=context.tenant_id, reranker=reranker)
         rag_result = await rag.query(
             question=context.user_query,
             system_prompt=system_prompt,
@@ -30,6 +32,7 @@ class KnowledgeAgent(BaseAgent):
             metadata={
                 "chunks_used": rag_result.get("chunks_used", 0),
                 "language": rag_result.get("language"),
+                "reranker": reranker.name,
                 "tenant_prompt_override": bool(
                     (tenant_settings.get("prompts", {}) or {}).get("rag_system_v1")
                 ),

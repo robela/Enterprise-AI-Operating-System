@@ -170,6 +170,69 @@ async def test_admin_can_update_and_get_tenant_prompts(client, db_session) -> No
 
 
 @pytest.mark.asyncio
+async def test_admin_can_switch_tenant_reranker(client, db_session) -> None:
+    now = datetime.now(timezone.utc)
+    db_session.add(
+        OrganizationModel(
+            org_id="org-rerank",
+            name="Rerank Org",
+            slug="rerank-org",
+            plan="starter",
+            max_users=10,
+            is_active=True,
+            created_at=now,
+            settings={"prompts": {"rag_system_v1": "keep this prompt"}},
+        )
+    )
+    await db_session.commit()
+
+    admin_headers = {
+        "Authorization": "Bearer "
+        + _token(user_id="admin-user", tenant_id="default", roles=["admin"], scopes=["admin"])
+    }
+    user_headers = {
+        "Authorization": "Bearer " + _token(user_id="normal-user", tenant_id="rerank-org", roles=["user"])
+    }
+
+    default = await client.get("/api/v1/tenants/rerank-org/rag", headers=admin_headers)
+    assert default.status_code == 200
+    assert default.json() == {
+        "tenant_id": "rerank-org",
+        "reranker": "vector",
+        "reranker_source": "default",
+    }
+
+    forbidden = await client.patch(
+        "/api/v1/tenants/rerank-org/rag", headers=user_headers, json={"reranker": "llm"}
+    )
+    assert forbidden.status_code == 403
+
+    invalid = await client.patch(
+        "/api/v1/tenants/rerank-org/rag", headers=admin_headers, json={"reranker": "cohere"}
+    )
+    assert invalid.status_code == 422
+
+    enabled = await client.patch(
+        "/api/v1/tenants/rerank-org/rag", headers=admin_headers, json={"reranker": "llm"}
+    )
+    assert enabled.status_code == 200
+    assert enabled.json()["reranker"] == "llm"
+    assert enabled.json()["reranker_source"] == "tenant"
+
+    tenant = await db_session.scalar(
+        select(OrganizationModel).where(OrganizationModel.slug == "rerank-org")
+    )
+    await db_session.refresh(tenant)
+    assert tenant.settings["rag"] == {"reranker": "llm"}
+    assert tenant.settings["prompts"] == {"rag_system_v1": "keep this prompt"}
+
+    disabled = await client.patch(
+        "/api/v1/tenants/rerank-org/rag", headers=admin_headers, json={"reranker": "vector"}
+    )
+    assert disabled.json()["reranker"] == "vector"
+
+
+@pytest.mark.asyncio
 async def test_admin_can_update_tenant_metadata(client, db_session) -> None:
     now = datetime.now(timezone.utc)
     db_session.add(

@@ -68,6 +68,11 @@ class Settings(BaseSettings):
     rag_temperature: float = Field(0.3, alias="RAG_TEMPERATURE")
     # 0 ranks by vector similarity only; 1 ranks by keyword overlap only.
     rag_rerank_lexical_weight: float = Field(0.3, alias="RAG_RERANK_LEXICAL_WEIGHT")
+    # Default reranker for tenants without their own choice: "vector" or "llm" (the chat
+    # model ranks passages by meaning, in any language it supports; one extra call).
+    rag_reranker: str = Field("vector", alias="RAG_RERANKER")
+    # Characters of each passage sent to the LLM reranker.
+    rag_rerank_max_passage_chars: int = Field(1500, alias="RAG_RERANK_MAX_PASSAGE_CHARS")
 
     # Multilingual
     # Detect the question's language and translate it to English for retrieval
