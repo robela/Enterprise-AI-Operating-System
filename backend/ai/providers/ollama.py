@@ -13,11 +13,12 @@ class OllamaProvider(BaseAIProvider):
     def __init__(self):
         self._base_url = settings.ollama_base_url
         self._model = settings.ollama_model
+        self._embedding_model = settings.ollama_embedding_model or settings.ollama_model
 
     async def chat(
         self, messages: list[ChatMessage], temperature: float = 0.7, max_tokens: int = 2048, **kwargs
     ) -> ChatResponse:
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=settings.ollama_timeout_seconds) as client:
             response = await client.post(
                 f"{self._base_url}/api/chat",
                 json={
@@ -38,7 +39,7 @@ class OllamaProvider(BaseAIProvider):
     async def stream_chat(
         self, messages: list[ChatMessage], temperature: float = 0.7, max_tokens: int = 2048, **kwargs
     ) -> AsyncIterator[str]:
-        async with httpx.AsyncClient(timeout=300) as client:
+        async with httpx.AsyncClient(timeout=settings.ollama_stream_timeout_seconds) as client:
             async with client.stream(
                 "POST",
                 f"{self._base_url}/api/chat",
@@ -55,13 +56,13 @@ class OllamaProvider(BaseAIProvider):
                         if content := chunk.get("message", {}).get("content"):
                             yield content
 
-    async def embed(self, texts: list[str]) -> list[list[float]]:
+    async def embed(self, texts: list[str], input_type: str | None = None) -> list[list[float]]:
         embeddings = []
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=settings.ollama_embed_timeout_seconds) as client:
             for text in texts:
                 resp = await client.post(
                     f"{self._base_url}/api/embeddings",
-                    json={"model": self._model, "prompt": text},
+                    json={"model": self._embedding_model, "prompt": text},
                 )
                 resp.raise_for_status()
                 embeddings.append(resp.json()["embedding"])

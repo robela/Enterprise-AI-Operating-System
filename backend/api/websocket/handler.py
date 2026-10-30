@@ -28,7 +28,13 @@ async def websocket_chat(websocket: WebSocket):
                 continue
 
             messages = [
-                ChatMessage(role="system", content="You are a helpful enterprise AI assistant."),
+                ChatMessage(
+                    role="system",
+                    content=(
+                        "You are a helpful enterprise AI assistant. "
+                        "Reply in the same language as the user's message."
+                    ),
+                ),
             ]
             for turn in history[-6:]:
                 messages.append(ChatMessage(role=turn["role"], content=turn["content"]))

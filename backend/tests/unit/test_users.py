@@ -1,6 +1,7 @@
 """Unit tests for the User domain."""
 import pytest
 
+from backend.core.exceptions.base import ConflictException
 from backend.domains.users.application.services.user_service import UserService
 from backend.domains.users.domain.entities.user import User, UserStatus
 from backend.domains.identity.application.services.auth_service import AuthService

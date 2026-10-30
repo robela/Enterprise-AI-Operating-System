@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import math
 
 from sqlalchemy.exc import OperationalError
 
@@ -187,27 +189,15 @@ class PgVectorStore:
                         result = await session.execute(
                             text(
                                 """
-                                SELECT document_id, chunk_index, chunk_text
+                                SELECT document_id, chunk_index, chunk_text, embedding
                                 FROM document_chunks
                                 WHERE tenant_id = :tenant_id
                                 ORDER BY rowid DESC
-                                LIMIT :top_k
                                 """
                             ),
-                            {
-                                "tenant_id": self.tenant_id,
-                                "top_k": top_k,
-                            },
+                            {"tenant_id": self.tenant_id},
                         )
-                        rows = result.fetchall()
-                        return [
-                            Chunk(
-                                text=row.chunk_text,
-                                chunk_index=row.chunk_index,
-                                document_id=row.document_id,
-                            )
-                            for row in rows
-                        ]
+                        return rank_by_similarity(result.fetchall(), query_embedding, top_k)
                 except OperationalError as exc:
                     if self._is_sqlite_locked(exc) and attempt < attempts - 1:
                         await asyncio.sleep(0.03 * (2**attempt))
@@ -219,10 +209,11 @@ class PgVectorStore:
             result = await session.execute(
                 text(
                     """
-                    SELECT document_id, chunk_index, chunk_text
+                    SELECT document_id, chunk_index, chunk_text,
+                           embedding <=> :embedding AS distance
                     FROM document_chunks
                     WHERE tenant_id = :tenant_id
-                    ORDER BY embedding <=> :embedding
+                    ORDER BY distance
                     LIMIT :top_k
                     """
                 ),
@@ -238,6 +229,41 @@ class PgVectorStore:
                     text=row.chunk_text,
                     chunk_index=row.chunk_index,
                     document_id=row.document_id,
+                    # Cosine distance -> cosine similarity, so higher means more relevant.
+                    score=1.0 - float(row.distance),
                 )
                 for row in rows
             ]
+
+
+def rank_by_similarity(rows, query_embedding: list[float], top_k: int) -> list[Chunk]:
+    """Cosine ranking for the SQLite dev store, which has no vector operators.
+
+    Rows must be ordered newest first; the stable sort keeps that order for ties.
+    Rows whose embedding is missing or has a different dimension are skipped.
+    """
+    scored: list[Chunk] = []
+    for row in rows:
+        try:
+            embedding = json.loads(row.embedding) if row.embedding else None
+        except ValueError:
+            embedding = None
+        if not embedding or len(embedding) != len(query_embedding):
+            continue
+        scored.append(
+            Chunk(
+                text=row.chunk_text,
+                chunk_index=row.chunk_index,
+                document_id=row.document_id,
+                score=_cosine_similarity(query_embedding, embedding),
+            )
+        )
+    scored.sort(key=lambda chunk: chunk.score, reverse=True)
+    return scored[:top_k]
+
+
+def _cosine_similarity(a: list[float], b: list[float]) -> float:
+    norm = math.sqrt(sum(x * x for x in a)) * math.sqrt(sum(y * y for y in b))
+    if not norm:
+        return 0.0
+    return sum(x * y for x, y in zip(a, b)) / norm

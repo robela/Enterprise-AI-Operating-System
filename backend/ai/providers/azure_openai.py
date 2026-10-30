@@ -54,7 +54,7 @@ class AzureOpenAIProvider(BaseAIProvider):
             if delta:
                 yield delta
 
-    async def embed(self, texts: list[str]) -> list[list[float]]:
+    async def embed(self, texts: list[str], input_type: str | None = None) -> list[list[float]]:
         response = await self._client.embeddings.create(
             model=self._embedding_model, input=texts
         )

@@ -91,6 +91,7 @@ export const getChatResponse = async (params: GetChatResponseParams): Promise<Me
     tracer_json: data.trace || {},
     response_metadata: { chunks: {} },
     completeness: data.completeness,
+    original_language: data.language ?? undefined,
     images: [],
     video_segments: [],
     timestamp: new Date(),

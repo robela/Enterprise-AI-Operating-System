@@ -12,6 +12,8 @@ from backend.core.security.oauth2 import get_current_user, CurrentUser
 from backend.core.database.session import get_db
 from backend.ai.orchestration.orchestrator import OrchestratorAgent
 from backend.ai.agents.base_agent import AgentContext
+from backend.ai.multilingual import analyze_query
+from backend.ai.providers import get_provider
 from backend.ai.rag.pipeline import RAGPipeline
 from backend.ai.safety.policy import SafetyPolicy
 from backend.infrastructure.persistence.models import (
@@ -35,11 +37,13 @@ class ChatRequest(BaseModel):
     document_program: list[str] | None = None
     document_module: list[str] | None = None
     document_type: str | None = None
+    language: str | None = None  # Answer language (ISO code, e.g. "am"); detected when omitted
 
 
 class RAGQueryRequest(BaseModel):
     question: str
     top_k: int = 5
+    language: str | None = None  # Answer language (ISO code); detected when omitted
 
 
 class ChatResponse(BaseModel):
@@ -51,6 +55,7 @@ class ChatResponse(BaseModel):
     requires_human_review: bool = False
     trace: list[dict] | None = None
     completeness: "CompletenessMetadata | None" = None
+    language: str | None = None  # Language of the answer (ISO code), when known
 
 
 class CompletenessMetadata(BaseModel):
@@ -201,6 +206,18 @@ async def chat(
         sources: list[str] = []
         agent_name = ""
         trace: list[dict] | None = None
+        language = None
+        english_query = None
+
+        if safety.safe:
+            # Detect the language and translate to English for retrieval, routing, and
+            # the safety patterns (which are English).
+            analysis = await analyze_query(
+                message, get_provider(), requested_language=body.language
+            )
+            language, english_query = analysis.language, analysis.english_query
+            if english_query:
+                safety = _safety.check_input(message, also_check=[english_query])
 
         if not safety.safe:
             requires_human_review = True
@@ -236,7 +253,11 @@ async def chat(
                 tenant_id=current_user.tenant_id,
                 user_id=current_user.user_id,
                 conversation_history=conversation_history or body.conversation_history,
-                metadata={"tenant_settings": tenant_settings},
+                metadata={
+                    "tenant_settings": tenant_settings,
+                    "language": language,
+                    "english_query": english_query,
+                },
             )
             result = await orchestrator.run(context)
             answer_text = result.answer
@@ -279,6 +300,7 @@ async def chat(
                 )
                 if agent_name == "completeness" else None
             ),
+            language=language,
         )
     except HTTPException:
         raise
@@ -286,6 +308,11 @@ async def chat(
         import traceback
         error_msg = f"Chat endpoint error: {str(e)}\n{traceback.format_exc()}"
         print(error_msg)
+        if str(e).lower().find("gemini") >= 0 or str(e).lower().find("api key") >= 0 or str(e).lower().find("model") >= 0:
+            raise HTTPException(
+                status_code=503,
+                detail="AI provider is temporarily unavailable. Please check the configured Gemini key and model settings.",
+            )
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -294,12 +321,19 @@ async def rag_query(
     body: RAGQueryRequest,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ):
+    analysis = await analyze_query(body.question, get_provider(), requested_language=body.language)
     pipeline = RAGPipeline(tenant_id=current_user.tenant_id)
-    result = await pipeline.query(body.question, top_k=body.top_k)
+    result = await pipeline.query(
+        body.question,
+        top_k=body.top_k,
+        language=analysis.language,
+        english_query=analysis.english_query,
+    )
     return ChatResponse(
         answer=result["answer"],
         message_id=str(uuid4()),
-        sources=result["sources"]
+        sources=result["sources"],
+        language=result["language"],
     )
 
 

@@ -73,11 +73,11 @@ class OpenAIProvider(BaseAIProvider):
             if delta:
                 yield delta
 
-    async def embed(self, texts: list[str]) -> list[list[float]]:
+    async def embed(self, texts: list[str], input_type: str | None = None) -> list[list[float]]:
         if not _has_usable_api_key():
             from backend.ai.providers.mock import MockProvider
 
-            return await MockProvider().embed(texts)
+            return await MockProvider().embed(texts, input_type)
 
         if self._client is None:
             self._client = AsyncOpenAI(api_key=settings.openai_api_key)

@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from backend.core.config.settings import settings
 from backend.core.security.oauth2 import get_current_user, CurrentUser
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -23,12 +24,12 @@ async def get_global_settings(
 ):
     """Get global application settings."""
     # Check user role for admin features
-    tracer_enabled = current_user.role == "admin"
-    
+    tracer_enabled = current_user.has_role("admin")
+
     return GlobalSettings(
         tts_enabled=True,
         stt_enabled=True,
         surveys_enabled=True,
         tracer_enabled=tracer_enabled,
-        languages=["en", "es", "fr"],
+        languages=settings.supported_languages,
     )

@@ -1,13 +1,17 @@
 """RAG pipeline — ingest and query documents."""
 from __future__ import annotations
 
+import asyncio
+
 import structlog
 
-from backend.ai.rag.chunker import TextChunker
+from backend.ai.rag.chunker import Chunk, TextChunker
 from backend.ai.rag.retriever import VectorRetriever
 from backend.ai.rag.reranker import CrossEncoderReranker
-from backend.ai.providers import get_provider
+from backend.ai.providers import get_embedding_provider, get_provider
 from backend.ai.base import ChatMessage
+from backend.ai.language import answer_matches_language, language_directive, rewrite_instruction
+from backend.core.config.settings import settings
 
 logger = structlog.get_logger(__name__)
 
@@ -16,7 +20,8 @@ class RAGPipeline:
     """
     Full RAG pipeline:
     Ingest: Document → Chunks → Embeddings → Vector Store
-    Query:  Question → Retrieve → Rerank → LLM → Answer + Citations
+    Query:  Question (+ English translation) → Retrieve → Rerank → LLM → Answer in the
+            user's language + Citations
     """
 
     def __init__(self, tenant_id: str):
@@ -28,8 +33,8 @@ class RAGPipeline:
     async def ingest(self, document_id: str, text: str, metadata: dict | None = None) -> int:
         """Chunk, embed, and store a document. Returns chunk count."""
         chunks = self._chunker.chunk(text)
-        provider = get_provider()
-        embeddings = await provider.embed([c.text for c in chunks])
+        provider = get_embedding_provider()
+        embeddings = await provider.embed([c.text for c in chunks], input_type="document")
         await self._retriever.store(
             document_id=document_id,
             chunks=chunks,
@@ -47,16 +52,27 @@ class RAGPipeline:
     async def query(
         self,
         question: str,
-        top_k: int = 5,
+        top_k: int | None = None,
         system_prompt: str | None = None,
+        language: str | None = None,
+        english_query: str | None = None,
     ) -> dict:
-        """Retrieve relevant chunks and generate an answer."""
+        """Retrieve relevant chunks and answer in the user's language.
+
+        language is the answer language (ISO code); None means "same as the question".
+        english_query is an English translation of a non-English question. Searching
+        with both finds English and same-language documents.
+        """
+        top_k = top_k or settings.rag_top_k
         provider = get_provider()
-        query_embedding = (await provider.embed([question]))[0]
+        search_queries = [question]
+        if english_query and english_query.strip().casefold() != question.strip().casefold():
+            search_queries.append(english_query)
+        query_embeddings = await get_embedding_provider().embed(search_queries, input_type="query")
 
         try:
-            candidates = await self._retriever.retrieve(query_embedding, top_k=top_k * 2)
-            chunks = self._reranker.rerank(question, candidates, top_k=top_k)
+            candidates = await self._retrieve(query_embeddings, top_k * 2)
+            chunks = self._reranker.rerank(search_queries, candidates, top_k=top_k)
         except Exception as exc:
             logger.warning("rag_retrieval_failed", tenant_id=self.tenant_id, error=str(exc))
             chunks = []
@@ -76,6 +92,8 @@ class RAGPipeline:
                 "Always cite sources using [Source: ...] notation.\n\n"
                 f"Context:\n{context}"
             )
+        # Appended last so it also applies to tenant prompt overrides.
+        rendered_system_prompt = f"{rendered_system_prompt}\n\n{language_directive(language)}"
 
         messages = [
             ChatMessage(
@@ -85,10 +103,41 @@ class RAGPipeline:
             ChatMessage(role="user", content=question),
         ]
 
-        response = await provider.chat(messages, temperature=0.3)
+        response = await provider.chat(messages, temperature=settings.rag_temperature)
+        answer = response.content
+
+        # Models sometimes answer in the context's language (usually English) instead of
+        # the user's. When the script shows that clearly, ask once for a rewrite.
+        if not answer_matches_language(answer, language, question):
+            logger.warning("rag_answer_language_mismatch", tenant_id=self.tenant_id, language=language)
+            retry = await provider.chat(
+                messages
+                + [
+                    ChatMessage(role="assistant", content=answer),
+                    ChatMessage(role="user", content=rewrite_instruction(language)),
+                ],
+                temperature=settings.rag_temperature,
+            )
+            if answer_matches_language(retry.content, language, question):
+                answer = retry.content
 
         return {
-            "answer": response.content,
+            "answer": answer,
             "sources": [c.document_id for c in chunks],
             "chunks_used": len(chunks),
+            "language": language,
         }
+
+    async def _retrieve(self, query_embeddings: list[list[float]], limit: int) -> list[Chunk]:
+        """Search with each query embedding and merge, keeping each chunk's best score."""
+        results = await asyncio.gather(
+            *(self._retriever.retrieve(embedding, top_k=limit) for embedding in query_embeddings)
+        )
+        merged: dict[tuple[str, int], Chunk] = {}
+        for chunks in results:
+            for chunk in chunks:
+                key = (chunk.document_id, chunk.chunk_index)
+                best = merged.get(key)
+                if best is None or (chunk.score or 0.0) > (best.score or 0.0):
+                    merged[key] = chunk
+        return list(merged.values())

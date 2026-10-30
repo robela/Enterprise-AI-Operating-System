@@ -198,7 +198,7 @@ export default function ChatMessage({
         ) : message.audioUrl ? (
           <VoiceMessage audioUrl={message.audioUrl} isSender={isUser} />
         ) : (
-          <div className="markdown-body">
+          <div className="markdown-body" lang={message.original_language} dir="auto">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {message.text}
             </ReactMarkdown>

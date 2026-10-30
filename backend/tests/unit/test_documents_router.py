@@ -177,6 +177,8 @@ async def test_reingest_keeps_indexed_status_when_workflow_draft_persistence_fai
     async def fail_replace_drafts(*_args, **_kwargs) -> None:
         raise RuntimeError("Workflow draft persistence failed")
 
+    # The upload is not a real PDF, so stub text extraction as well as page extraction.
+    monkeypatch.setattr(documents_router, "extract_text", lambda *_args, **_kwargs: "Step 1\nStep 2")
     monkeypatch.setattr(documents_router, "extract_pdf_pages", lambda _content: ["Step 1\nStep 2"])
     monkeypatch.setattr(documents_router, "extract_workflow_drafts", lambda _pages: [])
     monkeypatch.setattr(

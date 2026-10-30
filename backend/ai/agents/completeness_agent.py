@@ -43,8 +43,12 @@ class CompletenessAgent(BaseAgent):
         self._session_factory = session_factory
 
     async def run(self, context: AgentContext) -> AgentResult:
+        # The field patterns are English, so also match against the English translation
+        # of a non-English question. Earlier turns are not translated.
+        english_query = context.metadata.get("english_query") or ""
         combined_text = "\n".join(
-            [context.user_query] + [str(message.get("content", "")) for message in context.conversation_history]
+            [context.user_query, english_query]
+            + [str(message.get("content", "")) for message in context.conversation_history]
         )
         async with self._session_factory() as db:
             result = await db.execute(
@@ -96,6 +100,7 @@ class CompletenessAgent(BaseAgent):
                 "workflow_id": workflow.workflow_id,
                 "missing_fields": missing_fields,
                 "source_pages": workflow.source_pages or [],
+                "used_translated_input": bool(english_query),
             },
         )
 

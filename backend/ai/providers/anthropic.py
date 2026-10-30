@@ -12,7 +12,7 @@ class AnthropicProvider(BaseAIProvider):
 
     def __init__(self):
         self._client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-        self._model = "claude-3-5-sonnet-20241022"
+        self._model = settings.anthropic_model
 
     async def chat(
         self, messages: list[ChatMessage], temperature: float = 0.7, max_tokens: int = 2048, **kwargs
@@ -45,7 +45,7 @@ class AnthropicProvider(BaseAIProvider):
             async for text in stream.text_stream:
                 yield text
 
-    async def embed(self, texts: list[str]) -> list[list[float]]:
+    async def embed(self, texts: list[str], input_type: str | None = None) -> list[list[float]]:
         # Anthropic doesn't expose embeddings — delegate to OpenAI
         from backend.ai.providers.openai import OpenAIProvider
-        return await OpenAIProvider().embed(texts)
+        return await OpenAIProvider().embed(texts, input_type)

@@ -63,6 +63,7 @@ class QdrantStore:
                 text=r.payload["chunk_text"],
                 chunk_index=r.payload["chunk_index"],
                 document_id=r.payload["document_id"],
+                score=r.score,
             )
             for r in results
         ]

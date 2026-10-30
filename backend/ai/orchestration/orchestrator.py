@@ -9,6 +9,9 @@ from backend.ai.agents.knowledge_agent import KnowledgeAgent
 from backend.ai.agents.validation_agent import ValidationAgent
 from backend.ai.agents.translation_agent import TranslationAgent
 from backend.ai.agents.completeness_agent import CompletenessAgent
+from backend.ai.language import base_language
+from backend.ai.multilingual import localize_answer
+from backend.ai.providers import get_provider
 
 logger = structlog.get_logger(__name__)
 
@@ -19,6 +22,9 @@ class OrchestratorAgent:
     1. Classifies the user intent.
     2. Routes to the appropriate specialist agent(s).
     3. Assembles the final response.
+
+    Reads context.metadata["language"] (answer language) and
+    context.metadata["english_query"] (English translation) when the caller provides them.
     """
 
     def __init__(self):
@@ -28,7 +34,9 @@ class OrchestratorAgent:
         self._completeness = CompletenessAgent()
 
     async def run(self, context: AgentContext) -> AgentResult:
-        logger.info("orchestrator_run", user_query=context.user_query[:80])
+        language = context.metadata.get("language")
+        # Log sizes and codes only; the query itself may contain health information.
+        logger.info("orchestrator_run", query_chars=len(context.user_query), language=language)
 
         intent = await self._classify_intent(context)
         logger.info("intent_classified", intent=intent)
@@ -36,7 +44,7 @@ class OrchestratorAgent:
         if intent == "knowledge":
             return await self._knowledge.run(context)
         if intent == "completeness":
-            return await self._completeness.run(context)
+            return await self._localize(await self._completeness.run(context), language)
         if intent == "validation":
             return await self._validation.run(context)
         if intent == "translation":
@@ -46,25 +54,52 @@ class OrchestratorAgent:
         return await self._knowledge.run(context)
 
     async def _classify_intent(self, context: AgentContext) -> str:
-        """Simple keyword-based intent classifier — replace with LLM call in production."""
-        q = context.user_query.lower()
-        if any(w in q for w in ["translate", "translation", "in french", "in spanish"]):
+        """Simple keyword-based intent classifier — replace with LLM call in production.
+
+        Also checks the English translation, so non-English questions route the same way.
+        """
+        queries = [context.user_query.lower()]
+        english_query = context.metadata.get("english_query")
+        if english_query:
+            queries.append(english_query.lower())
+
+        if any(_is_translation(q) for q in queries):
             return "translation"
-        if any(phrase in q for phrase in ["missing information", "missing questions", "missed questions", "check missing", "check missed"]):
+        if any(_is_completeness(q) for q in queries):
             return "completeness"
-        if "child" in q and re.search(
-            r"\b(?:cough|fever|diarrh(?:ea|oea)|vomiting|difficulty breathing|breathing problem)\b", q
-        ):
-            return "completeness"
-        if any(q.startswith(field) for field in [
-            "child's age:",
-            "general danger signs:",
-            "main symptoms:",
-            "nutrition or feeding status:",
-            "immunization status:",
-            "other problems:",
-        ]):
-            return "completeness"
-        if any(w in q for w in ["validate", "check", "verify", "is valid"]):
+        if any(any(w in q for w in ["validate", "check", "verify", "is valid"]) for q in queries):
             return "validation"
         return "knowledge"
+
+    async def _localize(self, result: AgentResult, language: str | None) -> AgentResult:
+        """Translate a fixed English answer. Keeps the English original so a reviewer can
+        compare, since these answers support clinical follow-up."""
+        if not language or base_language(language) == "en":
+            return result
+        translated = await localize_answer(result.answer, language, get_provider())
+        if not translated:
+            return result
+        result.answer = f"{translated}\n\n---\n\n*English original:*\n\n{result.answer}"
+        result.metadata = {**result.metadata, "machine_translated": True, "language": language}
+        return result
+
+
+def _is_translation(q: str) -> bool:
+    return any(w in q for w in ["translate", "translation", "in french", "in spanish"])
+
+
+def _is_completeness(q: str) -> bool:
+    if any(phrase in q for phrase in ["missing information", "missing questions", "missed questions", "check missing", "check missed"]):
+        return True
+    if "child" in q and re.search(
+        r"\b(?:cough|fever|diarrh(?:ea|oea)|vomiting|difficulty breathing|breathing problem)\b", q
+    ):
+        return True
+    return any(q.startswith(field) for field in [
+        "child's age:",
+        "general danger signs:",
+        "main symptoms:",
+        "nutrition or feeding status:",
+        "immunization status:",
+        "other problems:",
+    ])

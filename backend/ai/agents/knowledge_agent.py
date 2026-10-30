@@ -18,8 +18,9 @@ class KnowledgeAgent(BaseAgent):
         rag = RAGPipeline(tenant_id=context.tenant_id)
         rag_result = await rag.query(
             question=context.user_query,
-            top_k=5,
             system_prompt=system_prompt,
+            language=context.metadata.get("language"),
+            english_query=context.metadata.get("english_query"),
         )
 
         return AgentResult(
@@ -28,6 +29,7 @@ class KnowledgeAgent(BaseAgent):
             agent_name=self.agent_name,
             metadata={
                 "chunks_used": rag_result.get("chunks_used", 0),
+                "language": rag_result.get("language"),
                 "tenant_prompt_override": bool(
                     (tenant_settings.get("prompts", {}) or {}).get("rag_system_v1")
                 ),

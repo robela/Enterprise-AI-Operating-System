@@ -10,13 +10,17 @@ _PROMPTS: dict[str, dict[str, str]] = {
             "Answer questions using the context below.\n\n"
             "Context:\n{context}\n\n"
             "Rules:\n"
-            "- Answer in the same language as the user's question (for example: Amharic, English, Oromo, etc.).\n"
-            "- Use the retrieved English context as the source of truth and translate the answer into the user's language when needed.\n"
+            "- The context may be in a different language from the question. "
+            "Use it as the source of truth.\n"
+            "- Write the whole answer in the response language given below "
+            "(for example: Amharic, English, Oromo). Translate facts from the context faithfully, "
+            "and keep numbers, doses, units, and medicine names exact.\n"
             "- Cite sources with [Source: document_id].\n"
-            "- If the answer is not in the context, say 'I don't have that information'.\n"
+            "- If the answer is not in the context, say that you don't have that information, "
+            "in the response language.\n"
             "- Be concise, accurate, and grounded in the retrieved sources."
         ),
-        "version": "1",
+        "version": "2",
     },
     "validation_system_v1": {
         "template": (

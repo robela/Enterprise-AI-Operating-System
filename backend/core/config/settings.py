@@ -39,17 +39,44 @@ class Settings(BaseSettings):
 
     gemini_api_key: str = Field("", alias="GEMINI_API_KEY")
     gemini_model: str = Field("gemini-2.0-flash", alias="GEMINI_MODEL")
+    gemini_embedding_model: str = Field("models/gemini-embedding-001", alias="GEMINI_EMBEDDING_MODEL")
     anthropic_api_key: str = Field("", alias="ANTHROPIC_API_KEY")
+    anthropic_model: str = Field("claude-3-5-sonnet-20241022", alias="ANTHROPIC_MODEL")
 
     ollama_base_url: str = Field("http://localhost:11434", alias="OLLAMA_BASE_URL")
     ollama_model: str = Field("llama3", alias="OLLAMA_MODEL")
+    # Empty means reuse OLLAMA_MODEL for embeddings.
+    ollama_embedding_model: str = Field("", alias="OLLAMA_EMBEDDING_MODEL")
+    ollama_timeout_seconds: float = Field(120, alias="OLLAMA_TIMEOUT_SECONDS")
+    ollama_stream_timeout_seconds: float = Field(300, alias="OLLAMA_STREAM_TIMEOUT_SECONDS")
+    ollama_embed_timeout_seconds: float = Field(60, alias="OLLAMA_EMBED_TIMEOUT_SECONDS")
 
     ai_provider: str = Field("openai", alias="AI_PROVIDER")
 
     # Embeddings
-    embedding_provider: str = Field("openai", alias="EMBEDDING_PROVIDER")
+    # Empty means use the same provider as AI_PROVIDER.
+    embedding_provider: str = Field("", alias="EMBEDDING_PROVIDER")
     embedding_model: str = Field("text-embedding-3-small", alias="EMBEDDING_MODEL")
     embedding_dimension: int = Field(1536, alias="EMBEDDING_DIMENSION")
+
+    # RAG
+    rag_chunk_size: int = Field(512, alias="RAG_CHUNK_SIZE")
+    rag_chunk_overlap: int = Field(64, alias="RAG_CHUNK_OVERLAP")
+    # Upper bound per chunk, for scripts written without spaces between words.
+    rag_chunk_max_chars: int = Field(5000, alias="RAG_CHUNK_MAX_CHARS")
+    rag_top_k: int = Field(5, alias="RAG_TOP_K")
+    rag_temperature: float = Field(0.3, alias="RAG_TEMPERATURE")
+    # 0 ranks by vector similarity only; 1 ranks by keyword overlap only.
+    rag_rerank_lexical_weight: float = Field(0.3, alias="RAG_RERANK_LEXICAL_WEIGHT")
+
+    # Multilingual
+    # Detect the question's language and translate it to English for retrieval
+    # (one extra LLM call per question).
+    multilingual_query_analysis: bool = Field(True, alias="MULTILINGUAL_QUERY_ANALYSIS")
+    # Languages offered to the frontend (ISO codes, comma-separated or JSON list).
+    supported_languages: List[str] = Field(
+        default=["en", "am", "om"], alias="SUPPORTED_LANGUAGES"
+    )
 
     # Vector Store
     vector_store: str = Field("pgvector", alias="VECTOR_STORE")
@@ -94,7 +121,7 @@ class Settings(BaseSettings):
         default=["http://localhost:3000"], alias="CORS_ORIGINS"
     )
 
-    @field_validator("cors_origins", mode="before")
+    @field_validator("cors_origins", "supported_languages", mode="before")
     @classmethod
     def parse_cors_origins(cls, value):
         if isinstance(value, list):

@@ -44,7 +44,9 @@ class BaseAIProvider(ABC):
     ) -> AsyncIterator[str]: ...
 
     @abstractmethod
-    async def embed(self, texts: list[str]) -> list[list[float]]: ...
+    async def embed(self, texts: list[str], input_type: str | None = None) -> list[list[float]]:
+        """Embed texts. input_type is "document" or "query"; providers with
+        task-specific embeddings use it, the others ignore it."""
 
     async def health_check(self) -> bool:
         try:

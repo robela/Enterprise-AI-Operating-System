@@ -58,6 +58,6 @@ class MockProvider(BaseAIProvider):
         response = await self.chat(messages, temperature, max_tokens, **kwargs)
         yield response.content
 
-    async def embed(self, texts: list[str]) -> list[list[float]]:
+    async def embed(self, texts: list[str], input_type: str | None = None) -> list[list[float]]:
         """Generate mock embeddings for a batch of texts."""
         return [[0.1] * 1536 for _ in texts]
