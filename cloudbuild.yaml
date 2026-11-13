@@ -103,10 +103,28 @@ steps:
       - ${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/frontend:${BRANCH_NAME}
       - ./frontend
 
+  # ── 2b. Backend tests ───────────────────────────────────────────────────────
+  # Runs the backend tests (including the migration checks) with the dependencies installed
+  # in the image just built. A failure stops the build: nothing is pushed or deployed.
+  - name: gcr.io/cloud-builders/docker
+    id: test-backend
+    waitFor: [build-backend]
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        docker run --rm --user root -v /workspace:/src -w /src \
+          -e APP_ENV=test \
+          -e APP_SECRET_KEY=ci-test-only \
+          -e JWT_SECRET_KEY=ci-test-only \
+          -e DATABASE_URL=sqlite+aiosqlite:///:memory: \
+          "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/backend:${SHORT_SHA}" \
+          python -m pytest backend/tests -q -p no:cacheprovider
+
   # ── 3. Push images ──────────────────────────────────────────────────────────
   - name: gcr.io/cloud-builders/docker
     id: push-backend
-    waitFor: [build-backend]
+    waitFor: [test-backend]
     args: [push, --all-tags, "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO}/backend"]
 
   - name: gcr.io/cloud-builders/docker
@@ -137,7 +155,7 @@ steps:
           --vpc-connector="${_VPC_CONNECTOR}" \
           --vpc-egress=private-ranges-only \
           --add-cloudsql-instances="${_CLOUD_SQL_CONN}" \
-          --set-env-vars='APP_ENV='"$$env"',APP_DEBUG=false,REDIS_URL=${_REDIS_URL},STORAGE_BACKEND=gcs,GCS_BUCKET='"$$bucket"',GCS_PROJECT_ID=${_PROJECT_ID},MESSAGING_BACKEND=pubsub,AI_PROVIDER=gemini,CORS_ORIGINS=["http://localhost:3000"]' \
+          --set-env-vars='APP_ENV='"$$env"',APP_DEBUG=false,DATABASE_AUTO_CREATE=false,REDIS_URL=${_REDIS_URL},STORAGE_BACKEND=gcs,GCS_BUCKET='"$$bucket"',GCS_PROJECT_ID=${_PROJECT_ID},MESSAGING_BACKEND=pubsub,AI_PROVIDER=gemini,CORS_ORIGINS=["http://localhost:3000"]' \
           --set-secrets="APP_SECRET_KEY=APP_SECRET_KEY:latest,JWT_SECRET_KEY=JWT_SECRET_KEY:latest,DATABASE_URL=DATABASE_URL:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest"
 
   # ── 5. Deploy Celery worker ─────────────────────────────────────────────────
@@ -166,7 +184,7 @@ steps:
           --add-cloudsql-instances="${_CLOUD_SQL_CONN}" \
           --command=bash \
           --args="-c,python3 -m http.server 8060 & celery -A backend.workers.celery_app worker --loglevel=info" \
-          --set-env-vars="APP_ENV=$$env,REDIS_URL=${_REDIS_URL},STORAGE_BACKEND=gcs,GCS_BUCKET=$$bucket,GCS_PROJECT_ID=${_PROJECT_ID},MESSAGING_BACKEND=pubsub,AI_PROVIDER=gemini" \
+          --set-env-vars="APP_ENV=$$env,DATABASE_AUTO_CREATE=false,REDIS_URL=${_REDIS_URL},STORAGE_BACKEND=gcs,GCS_BUCKET=$$bucket,GCS_PROJECT_ID=${_PROJECT_ID},MESSAGING_BACKEND=pubsub,AI_PROVIDER=gemini" \
           --set-secrets="APP_SECRET_KEY=APP_SECRET_KEY:latest,JWT_SECRET_KEY=JWT_SECRET_KEY:latest,DATABASE_URL=DATABASE_URL:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest"
 
   # ── 6. Get backend URL ──────────────────────────────────────────────────────

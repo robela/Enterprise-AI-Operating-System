@@ -46,8 +46,11 @@ cp .env.example .env
 # Start all services
 docker compose up -d
 
-# Run migrations
-docker compose exec api alembic upgrade head
+# Migrations run automatically when the api container starts. To run them by hand:
+docker compose exec api alembic -c backend/alembic.ini upgrade head
+
+# After changing a model, add a migration (the tests fail until you do):
+docker compose exec api alembic -c backend/alembic.ini revision --autogenerate -m "describe the change"
 
 # Access API docs
 open http://localhost:8000/docs

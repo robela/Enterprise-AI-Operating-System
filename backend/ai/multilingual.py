@@ -69,7 +69,7 @@ async def analyze_query(
             temperature=0.0,
             max_tokens=1024,
         )
-        data = _parse_json_object(response.content)
+        data = parse_json_object(response.content)
     except Exception as exc:  # best-effort: fall back to the original question
         logger.warning("query_analysis_failed", error_type=type(exc).__name__)
         data = None
@@ -115,7 +115,8 @@ def _looks_english(text: str) -> bool:
     return len(set(hits)) >= 3 and len(hits) / len(tokens) >= 0.2
 
 
-def _parse_json_object(text: str | None) -> dict | None:
+def parse_json_object(text: str | None) -> dict | None:
+    """The first {...} object in a model reply, or None."""
     if not text:
         return None
     start, end = text.find("{"), text.rfind("}")

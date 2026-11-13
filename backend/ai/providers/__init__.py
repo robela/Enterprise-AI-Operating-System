@@ -19,6 +19,13 @@ def get_embedding_provider() -> BaseAIProvider:
 
 
 def get_provider(provider_name: str | None = None) -> BaseAIProvider:
+    """The named provider (default AI_PROVIDER), with timeouts and retries."""
+    from backend.ai.providers.resilient import ResilientProvider
+
+    return ResilientProvider(_build_provider(provider_name))
+
+
+def _build_provider(provider_name: str | None = None) -> BaseAIProvider:
     name = (provider_name or settings.ai_provider).lower()
 
     # If no API key is configured for the default provider, use mock for testing

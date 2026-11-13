@@ -8,7 +8,11 @@ from backend.ai.agents.base_agent import AgentContext, AgentResult
 from backend.ai.agents.knowledge_agent import KnowledgeAgent
 from backend.ai.agents.validation_agent import ValidationAgent
 from backend.ai.agents.translation_agent import TranslationAgent
-from backend.ai.agents.completeness_agent import CompletenessAgent
+from backend.ai.agents.completeness_agent import (
+    CompletenessAgent,
+    has_danger_sign,
+    is_follow_up_form_answer,
+)
 from backend.ai.language import base_language
 from backend.ai.multilingual import localize_answer
 from backend.ai.providers import get_provider
@@ -95,11 +99,6 @@ def _is_completeness(q: str) -> bool:
         r"\b(?:cough|fever|diarrh(?:ea|oea)|vomiting|difficulty breathing|breathing problem)\b", q
     ):
         return True
-    return any(q.startswith(field) for field in [
-        "child's age:",
-        "general danger signs:",
-        "main symptoms:",
-        "nutrition or feeding status:",
-        "immunization status:",
-        "other problems:",
-    ])
+    if "child" in q and has_danger_sign(q):
+        return True
+    return is_follow_up_form_answer(q)

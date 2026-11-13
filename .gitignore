@@ -48,9 +48,6 @@ logs/
 *.tar.gz
 *.whl
 
-# Alembic
-alembic/versions/*.py
-
 # Terraform
 *.tfstate
 *.tfstate.backup

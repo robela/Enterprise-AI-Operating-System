@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     database_url: str = Field(..., alias="DATABASE_URL")
     database_pool_size: int = Field(20, alias="DATABASE_POOL_SIZE")
     database_max_overflow: int = Field(0, alias="DATABASE_MAX_OVERFLOW")
+    # Local development only: create missing tables at startup. Deployed environments set
+    # this to false and run `alembic -c backend/alembic.ini upgrade head` instead.
+    database_auto_create: bool = Field(True, alias="DATABASE_AUTO_CREATE")
 
     # Redis
     redis_url: str = Field("redis://localhost:6379/0", alias="REDIS_URL")
@@ -73,6 +76,16 @@ class Settings(BaseSettings):
     rag_reranker: str = Field("vector", alias="RAG_RERANKER")
     # Characters of each passage sent to the LLM reranker.
     rag_rerank_max_passage_chars: int = Field(1500, alias="RAG_RERANK_MAX_PASSAGE_CHARS")
+    # Rewrite follow-up questions ("how long does it take?") into standalone questions
+    # using the user's earlier messages (one extra LLM call when there is history).
+    rag_query_rewrite: bool = Field(True, alias="RAG_QUERY_REWRITE")
+    rag_rewrite_history_turns: int = Field(6, alias="RAG_REWRITE_HISTORY_TURNS")
+
+    # LLM call resilience (all providers): per-call timeout and retries for temporary
+    # failures only (timeouts, rate limits, 5xx).
+    llm_timeout_seconds: float = Field(120, alias="LLM_TIMEOUT_SECONDS")
+    llm_max_retries: int = Field(2, alias="LLM_MAX_RETRIES")
+    llm_retry_base_delay_seconds: float = Field(1.0, alias="LLM_RETRY_BASE_DELAY_SECONDS")
 
     # Multilingual
     # Detect the question's language and translate it to English for retrieval

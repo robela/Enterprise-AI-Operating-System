@@ -9,7 +9,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.security.oauth2 import get_current_user, CurrentUser
-from backend.core.database.session import get_db
+from backend.core.database.session import AsyncSessionLocal, get_db
 from backend.ai.orchestration.orchestrator import OrchestratorAgent
 from backend.ai.agents.base_agent import AgentContext
 from backend.ai.multilingual import analyze_query
@@ -17,6 +17,7 @@ from backend.ai.providers import get_provider
 from backend.ai.rag.pipeline import RAGPipeline
 from backend.ai.rag.reranker import Reranker, build_reranker
 from backend.ai.safety.policy import SafetyPolicy
+from backend.ai.tracing import Stopwatch, build_trace, save_trace
 from backend.infrastructure.persistence.models import (
     ConversationModel,
     MessageModel,
@@ -25,6 +26,8 @@ from backend.infrastructure.persistence.models import (
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 _safety = SafetyPolicy()
+# Failed requests roll back the request's session, so their traces use a session of their own.
+_trace_session_factory = AsyncSessionLocal
 
 
 class ChatRequest(BaseModel):
@@ -142,6 +145,8 @@ async def chat(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    stopwatch = Stopwatch()
+    conversation_id = body.conversation_id
     try:
         # Extract message from either format
         message = body.message
@@ -187,6 +192,7 @@ async def chat(
             )
             db.add(conversation)
             await db.flush()
+        conversation_id = conversation.conversation_id
 
         user_message = MessageModel(
             message_id=str(uuid4()),
@@ -206,6 +212,7 @@ async def chat(
         answer_text = ""
         sources: list[str] = []
         agent_name = ""
+        agent_metadata: dict = {}
         trace: list[dict] | None = None
         language = None
         english_query = None
@@ -223,7 +230,8 @@ async def chat(
         if not safety.safe:
             requires_human_review = True
             answer_text = "I'm unable to process that request."
-            trace = [{"policy": "blocked_input"}]
+            agent_metadata = {"policy": "blocked_input"}
+            trace = [agent_metadata]
         else:
             tenant_settings: dict = {}
             tenant_org = await db.scalar(
@@ -265,7 +273,21 @@ async def chat(
             sources = result.sources
             agent_name = result.agent_name
             requires_human_review = result.requires_human_review
+            agent_metadata = result.metadata or {}
             trace = [result.metadata] if result.metadata else None
+
+        completeness = (
+            CompletenessMetadata(
+                workflow_id=agent_metadata.get("workflow_id"),
+                missing_fields=agent_metadata.get("missing_fields", []),
+                source_pages=agent_metadata.get("source_pages", []),
+            )
+            if agent_name == "completeness" else None
+        )
+        # Saved with the message so the follow-up form comes back with the conversation.
+        citations: dict = {"sources": sources}
+        if completeness:
+            citations["completeness"] = completeness.model_dump()
 
         assistant_message_id = str(uuid4())
         assistant_message = MessageModel(
@@ -273,7 +295,7 @@ async def chat(
             conversation_id=conversation.conversation_id,
             role="assistant",
             content=answer_text,
-            citations={"sources": sources},
+            citations=citations,
             images={},
             videos={},
             audio_url=None,
@@ -283,6 +305,22 @@ async def chat(
 
         conversation.message_count = (conversation.message_count or 0) + 2
         conversation.updated_at = datetime.utcnow()
+        db.add(
+            build_trace(
+                tenant_id=current_user.tenant_id,
+                user_id=current_user.user_id,
+                conversation_id=conversation.conversation_id,
+                message_id=assistant_message_id,
+                endpoint="chat",
+                status="ok" if safety.safe else "blocked",
+                latency_ms=stopwatch.elapsed_ms(),
+                agent=agent_name,
+                language=language,
+                sources=sources,
+                requires_human_review=requires_human_review,
+                metadata=agent_metadata,
+            )
+        )
         await db.flush()
 
         return ChatResponse(
@@ -293,19 +331,25 @@ async def chat(
             agent=agent_name,
             requires_human_review=requires_human_review,
             trace=trace,
-            completeness=(
-                CompletenessMetadata(
-                    workflow_id=result.metadata.get("workflow_id"),
-                    missing_fields=result.metadata.get("missing_fields", []),
-                    source_pages=result.metadata.get("source_pages", []),
-                )
-                if agent_name == "completeness" else None
-            ),
+            completeness=completeness,
             language=language,
         )
     except HTTPException:
         raise
     except Exception as e:
+        async with _trace_session_factory() as trace_session:
+            await save_trace(
+                trace_session,
+                build_trace(
+                    tenant_id=current_user.tenant_id,
+                    user_id=current_user.user_id,
+                    conversation_id=conversation_id,
+                    endpoint="chat",
+                    status="error",
+                    latency_ms=stopwatch.elapsed_ms(),
+                    error=e,
+                ),
+            )
         import traceback
         error_msg = f"Chat endpoint error: {str(e)}\n{traceback.format_exc()}"
         print(error_msg)
@@ -336,7 +380,9 @@ async def rag_query(
     body: RAGQueryRequest,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     reranker: Annotated[Reranker, Depends(get_tenant_reranker)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    stopwatch = Stopwatch()
     analysis = await analyze_query(body.question, get_provider(), requested_language=body.language)
     pipeline = RAGPipeline(tenant_id=current_user.tenant_id, reranker=reranker)
     result = await pipeline.query(
@@ -345,9 +391,28 @@ async def rag_query(
         language=analysis.language,
         english_query=analysis.english_query,
     )
+    message_id = str(uuid4())
+    db.add(
+        build_trace(
+            tenant_id=current_user.tenant_id,
+            user_id=current_user.user_id,
+            message_id=message_id,
+            endpoint="rag_query",
+            status="ok",
+            latency_ms=stopwatch.elapsed_ms(),
+            agent="knowledge",
+            language=result["language"],
+            sources=result["sources"],
+            metadata={
+                "reranker": reranker.name,
+                "chunks_used": result.get("chunks_used", 0),
+                "query_rewritten": result.get("query_rewritten", False),
+            },
+        )
+    )
     return ChatResponse(
         answer=result["answer"],
-        message_id=str(uuid4()),
+        message_id=message_id,
         sources=result["sources"],
         language=result["language"],
     )

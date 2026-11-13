@@ -31,4 +31,6 @@ EXPOSE 8060
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8060}/health || exit 1
 
-CMD ["sh", "-c", "exec uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8060} --workers ${UVICORN_WORKERS:-1}"]
+# Apply database migrations, then start the API. Set RUN_MIGRATIONS=false to skip them.
+# Commands that replace CMD (such as the Celery worker) do not run migrations.
+CMD ["sh", "-c", "if [ \"${RUN_MIGRATIONS:-true}\" = \"true\" ]; then alembic -c backend/alembic.ini upgrade head || exit 1; fi; exec uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8060} --workers ${UVICORN_WORKERS:-1}"]

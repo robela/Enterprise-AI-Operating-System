@@ -13,7 +13,10 @@ from backend.infrastructure.persistence.models import ExtractedWorkflowModel
 
 
 _FIELD_PATTERNS: dict[str, re.Pattern[str]] = {
-    "child_age": re.compile(r"\b(?:\d+\s*(?:years?|months?|weeks?)(?:\s+old)?|age\s*(?:is|:)?\s*\d+)\b", re.IGNORECASE),
+    "child_age": re.compile(
+        r"\b(?:\d+\s*(?:years?|months?|weeks?)(?:\s+old)?|age\s*(?:\((?:years?|months?)\))?\s*(?:is|:)?\s*\d+)\b",
+        re.IGNORECASE,
+    ),
     "general_danger_signs": re.compile(
         r"\b(?:danger signs?|unable to drink|not able to drink|vomits? everything|convulsions?|seizures?|unconscious)\b",
         re.IGNORECASE,
@@ -25,6 +28,16 @@ _FIELD_PATTERNS: dict[str, re.Pattern[str]] = {
     "nutrition_status": re.compile(r"\b(?:nutrition|weight|malnourished|feeding|appetite)\b", re.IGNORECASE),
     "immunization_status": re.compile(r"\b(?:immuni[sz]ation|vaccin(?:e|ated|ation))\b", re.IGNORECASE),
     "other_problems": re.compile(r"\b(?:other problem|additional problem|also has)\b", re.IGNORECASE),
+    # Built-in danger-sign checklist fields. A reported danger sign does not answer
+    # "other danger signs"; only an explicit statement about other signs does.
+    "other_danger_signs": re.compile(r"\b(?:other|additional|more|no|any)\s+danger\s+signs?\b", re.IGNORECASE),
+    "symptom_assessment": re.compile(
+        r"\b(?:cough|diarrh(?:ea|oea)|malnutrition|malnourished|ear (?:problem|pain|discharge|infection))\b",
+        re.IGNORECASE,
+    ),
+    "child_weight": re.compile(
+        r"\b\d+(?:\.\d+)?\s*(?:kg|kgs|kilograms?)\b|\bweight\s*(?:\(kg\))?\s*(?:is|:)?\s*\d", re.IGNORECASE
+    ),
 }
 _FIELD_QUESTIONS = {
     "child_age": "What is the child's age?",
@@ -33,7 +46,70 @@ _FIELD_QUESTIONS = {
     "nutrition_status": "What is known about the child's nutrition or feeding status?",
     "immunization_status": "What is the child's immunization status?",
     "other_problems": "Are there any other problems that need assessment?",
+    "other_danger_signs": "Are there any other general danger signs (unable to drink or breastfeed, vomits everything, convulsions, lethargic or unconscious)?",
+    "symptom_assessment": "Assess for cough, diarrhoea, malnutrition, and ear problems, depending on the child's age. What did you find?",
+    "child_weight": "What is the child's weight (kg)? It is needed for accurate drug dose calculation.",
 }
+
+# Built-in rule: when a general danger sign is reported, ask these regardless of the
+# tenant's approved workflows.
+_DANGER_SIGN_PATTERN = re.compile(
+    r"\b(?:lethargic|lethargy|unconscious|convulsions?|convulsing|seizures?|fits"
+    r"|(?:unable to|not able to|cannot|can't) (?:drink|breastfeed|breast feed)"
+    r"|vomit(?:s|ing)? everything)\b",
+    re.IGNORECASE,
+)
+DANGER_SIGN_CHECKLIST_ID = "builtin:danger-signs"
+_DANGER_SIGN_FIELDS = ["child_age", "other_danger_signs", "symptom_assessment", "child_weight"]
+
+
+_NEGATION_BEFORE = re.compile(r"\b(?:no|not|without|denies|never)\s+(?:\w+\s+)?$", re.IGNORECASE)
+
+
+def has_danger_sign(text: str) -> bool:
+    """True when a general danger sign is reported and not negated ("no convulsions")."""
+    return any(
+        not _NEGATION_BEFORE.search(text[max(0, match.start() - 20) : match.start()])
+        for match in _DANGER_SIGN_PATTERN.finditer(text)
+    )
+
+
+# Answers submitted from the chat's follow-up form start with one of its field labels
+# (frontend ClinicalFollowUpForm), lowercased.
+FOLLOW_UP_FORM_PREFIXES = (
+    "child's age:",
+    "child's age (years):",
+    "general danger signs:",
+    "main symptoms:",
+    "nutrition or feeding status:",
+    "immunization status:",
+    "other problems:",
+    "other danger signs:",
+    "cough, diarrhoea, malnutrition, ear problems:",
+    "child's weight (kg):",
+)
+
+
+def is_follow_up_form_answer(text: str) -> bool:
+    return text.strip().lower().startswith(FOLLOW_UP_FORM_PREFIXES)
+
+
+def current_case(user_query: str, history: list[str]) -> list[str]:
+    """The user messages of the latest case, oldest first.
+
+    A case is the last message that is not a follow-up form reply, plus the form replies
+    after it. A new question later in the same chat starts a new case, so facts from an
+    earlier case never count as answers.
+    """
+    messages = [text for text in history if text.strip()]
+    # The chat endpoint's history already includes the current message.
+    if messages and messages[-1].strip() == user_query.strip():
+        messages.pop()
+    messages.append(user_query)
+    start = len(messages) - 1
+    while start > 0 and is_follow_up_form_answer(messages[start]):
+        start -= 1
+    return messages[start:]
 
 
 class CompletenessAgent(BaseAgent):
@@ -46,10 +122,15 @@ class CompletenessAgent(BaseAgent):
         # The field patterns are English, so also match against the English translation
         # of a non-English question. Earlier turns are not translated.
         english_query = context.metadata.get("english_query") or ""
-        combined_text = "\n".join(
-            [context.user_query, english_query]
-            + [str(message.get("content", "")) for message in context.conversation_history]
-        )
+        history = [
+            str(message.get("content", ""))
+            for message in context.conversation_history
+            if message.get("role", "user") == "user"
+        ]
+        combined_text = "\n".join(current_case(context.user_query, history) + [english_query])
+        if has_danger_sign(combined_text):
+            return _danger_sign_result(combined_text, used_translated_input=bool(english_query))
+
         async with self._session_factory() as db:
             result = await db.execute(
                 select(ExtractedWorkflowModel).where(
@@ -103,6 +184,31 @@ class CompletenessAgent(BaseAgent):
                 "used_translated_input": bool(english_query),
             },
         )
+
+
+def _danger_sign_result(text: str, used_translated_input: bool) -> AgentResult:
+    missing_fields = [field for field in _DANGER_SIGN_FIELDS if not _FIELD_PATTERNS[field].search(text)]
+    source = "Source: built-in danger-sign checklist (not from an approved document)."
+    if not missing_fields:
+        answer = f"## Completeness check\n\nAll details in the danger-sign checklist are present.\n\n{source}"
+    else:
+        questions = [f"- {_FIELD_QUESTIONS[field]}" for field in missing_fields]
+        answer = (
+            "## Missing information\n\nA general danger sign was reported. Please provide:\n\n"
+            + "\n".join(questions)
+            + f"\n\n{source}"
+        )
+    return AgentResult(
+        answer=answer,
+        agent_name=CompletenessAgent.agent_name,
+        requires_human_review=True,
+        metadata={
+            "workflow_id": DANGER_SIGN_CHECKLIST_ID,
+            "missing_fields": missing_fields,
+            "source_pages": [],
+            "used_translated_input": used_translated_input,
+        },
+    )
 
 
 def _workflow_match_score(required_fields: list[str], text: str) -> tuple[int, int]:

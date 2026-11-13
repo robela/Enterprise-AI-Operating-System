@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import asyncio
+import re
 
 import structlog
 
 from backend.ai.rag.chunker import Chunk, TextChunker
+from backend.ai.rag.query_rewriter import rewrite_with_history
 from backend.ai.rag.retriever import VectorRetriever
 from backend.ai.rag.reranker import Reranker, VectorReranker
 from backend.ai.providers import get_embedding_provider, get_provider
@@ -14,6 +16,30 @@ from backend.ai.language import answer_matches_language, language_directive, rew
 from backend.core.config.settings import settings
 
 logger = structlog.get_logger(__name__)
+
+# Appended to every system prompt, including tenant overrides, because the cited ids are
+# how the answer's sources are chosen.
+_CITATION_DIRECTIVE = (
+    "Cite each fact with [Source: document_id], using the document ids shown in the context. "
+    "Cite nothing when the answer is not based on the context."
+)
+_CITATION_RE = re.compile(r"\[Source:\s*([^\]]+)\]", re.IGNORECASE)
+
+
+def cited_sources(answer: str, chunks: list[Chunk]) -> list[str]:
+    """Document ids the answer cites, in citation order, limited to the retrieved chunks.
+
+    Answers that cite nothing (greetings, "I don't have that information") get no sources,
+    instead of every retrieved document.
+    """
+    available = {chunk.document_id for chunk in chunks}
+    cited: list[str] = []
+    for match in _CITATION_RE.finditer(answer or ""):
+        for part in re.split(r"[,;]", match.group(1)):
+            document_id = part.strip()
+            if document_id in available and document_id not in cited:
+                cited.append(document_id)
+    return cited
 
 
 class RAGPipeline:
@@ -57,15 +83,23 @@ class RAGPipeline:
         system_prompt: str | None = None,
         language: str | None = None,
         english_query: str | None = None,
+        history: list[str] | None = None,
     ) -> dict:
         """Retrieve relevant chunks and answer in the user's language.
 
         language is the answer language (ISO code); None means "same as the question".
         english_query is an English translation of a non-English question. Searching
         with both finds English and same-language documents.
+        history is the user's earlier messages in the conversation, oldest first; a
+        follow-up question is rewritten with them before searching.
         """
         top_k = top_k or settings.rag_top_k
         provider = get_provider()
+        rewrite = await rewrite_with_history(question, history or [], provider)
+        if rewrite.rewritten:
+            question = rewrite.question
+            # The given translation was made from the follow-up without its context.
+            english_query = rewrite.english
         search_queries = [question]
         if english_query and english_query.strip().casefold() != question.strip().casefold():
             search_queries.append(english_query)
@@ -93,8 +127,10 @@ class RAGPipeline:
                 "Always cite sources using [Source: ...] notation.\n\n"
                 f"Context:\n{context}"
             )
-        # Appended last so it also applies to tenant prompt overrides.
-        rendered_system_prompt = f"{rendered_system_prompt}\n\n{language_directive(language)}"
+        # Appended last so they also apply to tenant prompt overrides.
+        rendered_system_prompt = (
+            f"{rendered_system_prompt}\n\n{_CITATION_DIRECTIVE}\n\n{language_directive(language)}"
+        )
 
         messages = [
             ChatMessage(
@@ -122,11 +158,13 @@ class RAGPipeline:
             if answer_matches_language(retry.content, language, question):
                 answer = retry.content
 
+        sources = cited_sources(answer, chunks)
         return {
             "answer": answer,
-            "sources": [c.document_id for c in chunks],
+            "sources": sources,
             "chunks_used": len(chunks),
             "language": language,
+            "query_rewritten": rewrite.rewritten,
         }
 
     async def _retrieve(self, query_embeddings: list[list[float]], limit: int) -> list[Chunk]:

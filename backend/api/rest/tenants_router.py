@@ -1,5 +1,5 @@
 """Tenant onboarding and registry endpoints (admin-only)."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import re
 from typing import Annotated, Literal
 from uuid import uuid4
@@ -27,6 +27,7 @@ from backend.domains.users.infrastructure.persistence.user_repository_impl impor
 )
 from backend.infrastructure.persistence.models import (
     OrganizationModel,
+    RequestTraceModel,
     SectorCatalogModel,
     TenantSectorModel,
 )
@@ -445,3 +446,117 @@ async def update_tenant_rag_settings(
 
     await db.flush()
     return _to_rag_settings_response(tenant)
+
+
+# ============ Request traces ============
+
+TraceStatus = Literal["ok", "blocked", "error"]
+
+
+class RequestTraceResponse(BaseModel):
+    trace_id: str
+    created_at: datetime
+    endpoint: str
+    agent: str | None
+    status: str
+    latency_ms: int
+    language: str | None
+    reranker: str | None
+    query_rewritten: bool
+    chunks_used: int
+    sources: list[str]
+    requires_human_review: bool
+    error_type: str | None
+    conversation_id: str | None
+    message_id: str | None
+    user_id: str | None
+    details: dict
+
+
+class TraceSummaryResponse(BaseModel):
+    tenant_id: str
+    days: int
+    requests: int
+    by_status: dict[str, int]
+    by_agent: dict[str, int]
+    avg_latency_ms: int | None
+    p95_latency_ms: int | None
+    no_sources: int
+    query_rewritten: int
+    requires_human_review: int
+
+
+@router.get("/{tenant_id}/traces", response_model=list[RequestTraceResponse])
+async def list_request_traces(
+    tenant_id: str,
+    current_user: CurrentUser = Depends(require_roles("admin", "tenant_admin")),
+    db: Annotated[AsyncSession, Depends(get_db)] = None,
+    status: TraceStatus | None = None,
+    agent: str | None = Query(None, max_length=50),
+    conversation_id: str | None = Query(None, max_length=36),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+):
+    """Recent AI requests for a tenant, newest first. Metadata only, no message text."""
+    _assert_tenant_scope(current_user, tenant_id)
+    query = select(RequestTraceModel).where(RequestTraceModel.tenant_id == tenant_id)
+    if status:
+        query = query.where(RequestTraceModel.status == status)
+    if agent:
+        query = query.where(RequestTraceModel.agent == agent)
+    if conversation_id:
+        query = query.where(RequestTraceModel.conversation_id == conversation_id)
+    rows = await db.scalars(
+        query.order_by(RequestTraceModel.created_at.desc()).offset(skip).limit(limit)
+    )
+    return [RequestTraceResponse.model_validate(row, from_attributes=True) for row in rows]
+
+
+@router.get("/{tenant_id}/traces/summary", response_model=TraceSummaryResponse)
+async def summarize_request_traces(
+    tenant_id: str,
+    current_user: CurrentUser = Depends(require_roles("admin", "tenant_admin")),
+    db: Annotated[AsyncSession, Depends(get_db)] = None,
+    days: int = Query(7, ge=1, le=90),
+):
+    """Counts and latency for a tenant's AI requests over the last ``days`` days."""
+    _assert_tenant_scope(current_user, tenant_id)
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    rows = (
+        await db.execute(
+            select(
+                RequestTraceModel.status,
+                RequestTraceModel.agent,
+                RequestTraceModel.latency_ms,
+                RequestTraceModel.sources,
+                RequestTraceModel.query_rewritten,
+                RequestTraceModel.requires_human_review,
+            ).where(
+                RequestTraceModel.tenant_id == tenant_id,
+                RequestTraceModel.created_at >= since,
+            )
+        )
+    ).all()
+
+    latencies = sorted(row.latency_ms for row in rows)
+    by_status: dict[str, int] = {}
+    by_agent: dict[str, int] = {}
+    for row in rows:
+        by_status[row.status] = by_status.get(row.status, 0) + 1
+        agent_name = row.agent or "none"
+        by_agent[agent_name] = by_agent.get(agent_name, 0) + 1
+
+    return TraceSummaryResponse(
+        tenant_id=tenant_id,
+        days=days,
+        requests=len(rows),
+        by_status=by_status,
+        by_agent=by_agent,
+        avg_latency_ms=round(sum(latencies) / len(latencies)) if latencies else None,
+        p95_latency_ms=latencies[min(len(latencies) - 1, int(len(latencies) * 0.95))]
+        if latencies
+        else None,
+        no_sources=sum(1 for row in rows if row.status == "ok" and not row.sources),
+        query_rewritten=sum(1 for row in rows if row.query_rewritten),
+        requires_human_review=sum(1 for row in rows if row.requires_human_review),
+    )

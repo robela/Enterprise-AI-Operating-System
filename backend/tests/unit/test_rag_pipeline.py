@@ -114,7 +114,7 @@ async def test_language_directive_follows_tenant_prompt_override(rag) -> None:
 
 @pytest.mark.asyncio
 async def test_uses_the_injected_reranker(rag) -> None:
-    pipeline, _, _ = rag([AMHARIC_ANSWER])
+    pipeline, chat, _ = rag([AMHARIC_ANSWER])
 
     class RecordingReranker:
         def __init__(self):
@@ -133,7 +133,49 @@ async def test_uses_the_injected_reranker(rag) -> None:
 
     assert reranker.calls[0][0] == [AMHARIC_QUESTION, ENGLISH_TRANSLATION]
     assert reranker.calls[0][2] == 2
+    context = chat.chat_calls[0][0].content
+    assert "[Source: doc-vax]" in context and "[Source: doc-am]" not in context
+    # The answer cites doc-en, which the reranker dropped, so nothing is attributed.
+    assert result["sources"] == []
+
+
+@pytest.mark.asyncio
+async def test_sources_are_only_the_cited_documents(rag) -> None:
+    pipeline, chat, _ = rag(["The vaccination schedule is in [Source: doc-vax; doc-unknown]."])
+
+    result = await pipeline.query("Where is the vaccination schedule?", top_k=3)
+
     assert result["sources"] == ["doc-vax"]
+    assert "Cite each fact with [Source: document_id]" in chat.chat_calls[0][0].content
+
+
+@pytest.mark.asyncio
+async def test_answers_without_citations_list_no_sources(rag) -> None:
+    pipeline, _, _ = rag(["Hello! How can I help you today?"])
+
+    result = await pipeline.query("hello")
+
+    assert result["sources"] == []
+
+
+@pytest.mark.asyncio
+async def test_follow_up_is_rewritten_before_searching(rag) -> None:
+    standalone = "Where is the fever guideline for children?"
+    pipeline, chat, embedder = rag(
+        [
+            f'{{"question": "{standalone}", "english": "{standalone}"}}',
+            "It is on page four. [Source: doc-en]",
+        ]
+    )
+
+    result = await pipeline.query(
+        "Where is it?", history=["Tell me about the fever guideline for children", "Where is it?"]
+    )
+
+    assert embedder.embed_calls == [([standalone], "query")]
+    assert chat.chat_calls[1][-1].content == standalone  # answered as the standalone question
+    assert result["query_rewritten"] is True
+    assert result["sources"] == ["doc-en"]
 
 
 def test_reranker_is_injected_through_the_constructor() -> None:

@@ -14,13 +14,14 @@ _PROMPTS: dict[str, dict[str, str]] = {
             "Use it as the source of truth.\n"
             "- Write the whole answer in the response language given below "
             "(for example: Amharic, English, Oromo). Translate facts from the context faithfully, "
-            "and keep numbers, doses, units, and medicine names exact.\n"
+            "and keep numbers, amounts, units, dates, and names exact.\n"
+            "- Do not add facts, figures, or thresholds that are not in the context.\n"
             "- Cite sources with [Source: document_id].\n"
             "- If the answer is not in the context, say that you don't have that information, "
             "in the response language.\n"
             "- Be concise, accurate, and grounded in the retrieved sources."
         ),
-        "version": "2",
+        "version": "3",
     },
     "validation_system_v1": {
         "template": (

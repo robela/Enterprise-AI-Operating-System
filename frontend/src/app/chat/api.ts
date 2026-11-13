@@ -1,5 +1,5 @@
 import axios from "axios";
-import { Message, ConversationSummary } from "./types";
+import { Message, ConversationSummary, CompletenessMetadata } from "./types";
 
 const BASE =
   typeof window === "undefined" ? process.env.NEXT_PUBLIC_BACKEND_URL?.trim() || "http://localhost:8060" : "";
@@ -137,7 +137,13 @@ export const getChatHistory = async (
 ): Promise<Message[]> => {
   try {
     const { data } = await client.get(`/api/v1/ai/chat/conversations/${chatId}`, { signal });
-    const messages: Message[] = (data.messages || []).map((msg: { id: string; role: string; content: string; created_at?: string }, idx: number) => ({
+    const messages: Message[] = (data.messages || []).map((msg: {
+      id: string;
+      role: string;
+      content: string;
+      created_at?: string;
+      citations?: { completeness?: CompletenessMetadata } | null;
+    }, idx: number) => ({
       id: idx + 1,
       text: msg.content,
       chat_id: chatId,
@@ -145,6 +151,7 @@ export const getChatHistory = async (
       request_id: idx,
       tracer_json: {},
       response_metadata: { chunks: {} },
+      completeness: msg.citations?.completeness ?? undefined,
       images: [],
       timestamp: new Date(msg.created_at || Date.now()),
     }));

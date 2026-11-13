@@ -25,10 +25,17 @@ const labels: Record<string, string> = {
   nutrition_status: "Nutrition or feeding status",
   immunization_status: "Immunization status",
   other_problems: "Other problems",
+  // Built-in danger-sign checklist. The backend routes answers by these labels.
+  other_danger_signs: "Other danger signs",
+  symptom_assessment: "Cough, diarrhoea, malnutrition, ear problems",
+  child_weight: "Child's weight (kg)",
 };
+
+const wideFields = new Set(["main_symptoms", "nutrition_status", "other_problems", "symptom_assessment"]);
 
 const selectOptions: Record<string, string[]> = {
   general_danger_signs: ["No danger signs", "Danger signs present", "Not known"],
+  other_danger_signs: ["No other danger signs", "Other danger signs present", "Not known"],
   immunization_status: ["Up to date", "Not up to date", "Not known"],
 };
 
@@ -47,9 +54,21 @@ export default function ClinicalFollowUpForm({ missingFields, disabled, onSubmit
     <form onSubmit={submit} className="mt-4 border-t pt-4">
       <div className="grid gap-3 sm:grid-cols-2">
         {missingFields.map((field) => (
-          <label key={field} className={field === "main_symptoms" || field === "nutrition_status" || field === "other_problems" ? "sm:col-span-2" : ""}>
+          <label key={field} className={wideFields.has(field) ? "sm:col-span-2" : ""}>
             <span className="mb-1 block text-sm font-medium">{labels[field] || field.replaceAll("_", " ")}</span>
-            {field === "child_age" ? (
+            {field === "child_weight" ? (
+              <Input
+                aria-label={labels[field]}
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                inputMode="decimal"
+                value={values[field] || ""}
+                onChange={(event) => setValues((current) => ({ ...current, [field]: event.target.value }))}
+                disabled={disabled}
+              />
+            ) : field === "child_age" ? (
               <Input
                 aria-label={labels[field]}
                 type="number"

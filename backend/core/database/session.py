@@ -117,16 +117,20 @@ DEFAULT_WORKFLOW_TEMPLATES: list[dict[str, object]] = [
 
 
 async def init_db() -> None:
-    """Create all tables (dev/test only — production uses Alembic)."""
+    """Seed default data, creating missing tables first when DATABASE_AUTO_CREATE is on.
+
+    Deployed environments turn auto-create off: the schema comes from Alembic migrations
+    (backend/migrations), which run before the server starts."""
     # Register every SQLAlchemy mapping before deriving the metadata schema.
-    import backend.infrastructure.persistence.models
+    import backend.infrastructure.persistence.models  # noqa: F401
 
-    async with engine.begin() as conn:
-        if not _is_sqlite:
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        await conn.run_sync(Base.metadata.create_all)
+    if settings.database_auto_create:
+        async with engine.begin() as conn:
+            if not _is_sqlite:
+                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+            await conn.run_sync(Base.metadata.create_all)
 
-    # Seed default sectors and workflow templates in dev/test environments.
+    # Seed default sectors and workflow templates.
     from backend.infrastructure.persistence.models import (
         SectorCatalogModel,
         WorkflowTemplateModel,

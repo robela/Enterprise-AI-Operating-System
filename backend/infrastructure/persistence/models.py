@@ -140,6 +140,36 @@ class ExtractedWorkflowModel(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class RequestTraceModel(Base):
+    """One record per AI request: what ran and how it went, for tenant admins.
+
+    Holds metadata only. Question and answer text stay in ``messages``, so deleting a
+    conversation removes the content while the counts and timings remain."""
+
+    __tablename__ = "request_traces"
+
+    trace_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
+    user_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    conversation_id: Mapped[Optional[str]] = mapped_column(String(36), index=True, nullable=True)
+    message_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    endpoint: Mapped[str] = mapped_column(String(50), nullable=False)
+    agent: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)  # ok, blocked, error
+    language: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    reranker: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    query_rewritten: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    chunks_used: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    sources: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    requires_human_review: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    latency_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    error_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    details: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+
+
 class WorkflowModel(Base):
     __tablename__ = "workflows"
 

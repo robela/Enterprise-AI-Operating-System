@@ -23,6 +23,11 @@ class KnowledgeAgent(BaseAgent):
             system_prompt=system_prompt,
             language=context.metadata.get("language"),
             english_query=context.metadata.get("english_query"),
+            history=[
+                str(message.get("content", ""))
+                for message in context.conversation_history
+                if message.get("role", "user") == "user"
+            ],
         )
 
         return AgentResult(
@@ -33,6 +38,7 @@ class KnowledgeAgent(BaseAgent):
                 "chunks_used": rag_result.get("chunks_used", 0),
                 "language": rag_result.get("language"),
                 "reranker": reranker.name,
+                "query_rewritten": rag_result.get("query_rewritten", False),
                 "tenant_prompt_override": bool(
                     (tenant_settings.get("prompts", {}) or {}).get("rag_system_v1")
                 ),
